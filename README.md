@@ -11,6 +11,17 @@ findings and a human-approved counterfactual replay.
 > personal data. It is a product demonstration, not evidence about any real
 > business.
 
+## OpenArena reviewer links
+
+- Public product demo:
+  https://lrwa-agent-web.cheeky-angel-7701.chatgpt.site
+- 90-second demo film:
+  https://lrwa-agent-web.cheeky-angel-7701.chatgpt.site/materials/LRWA_OpenArena_Demo_90s.mp4
+- Public pitch deck:
+  https://lrwa-agent-web.cheeky-angel-7701.chatgpt.site/materials/LRWA_Seed_Deck.pdf
+- Next.js frontend:
+  https://github.com/0xWeakSheep/lrwa-agent-web
+
 ## Run
 
 ```bash
