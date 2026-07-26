@@ -13,8 +13,8 @@ orders, scrape live platforms, or process personal data.
 Future production missions are limited to public, licensed,
 customer-authorized, or opt-in sources. Automated communication must disclose
 that it is automated. Sensitive collection and every counterfactual replay
-would require verified human approval in production. In this demo, approval is
-an unauthenticated API/UI interaction gate, not an identity-verified or
+would require verified human approval in production. This demo has only an
+unauthenticated API/UI interaction gate; it is not an identity-verified or
 compliance-grade approval system.
 
 ## Verification loop
@@ -23,7 +23,7 @@ compliance-grade approval system.
 flowchart LR
   A["Management claim"] --> B["Claim compiler"]
   B --> C["Bounded mission plan"]
-  C --> D["Caller approval gate"]
+  C --> D["Caller interaction gate"]
   D --> E["Five evidence families"]
   E --> F["Evidence verification"]
   F --> G["Deterministic estimate"]
@@ -33,9 +33,10 @@ flowchart LR
   J --> K["Evidence requests"]
 ```
 
-The canonical plan contains exactly five tasks and 1,024 parameterized probes:
+The canonical plan contains exactly five tasks and a declared aggregate quota
+of 1,024 parameterized probes:
 
-| Evidence family | Demo probes | Observable proxy |
+| Evidence category | Planned quota | Observable proxy |
 |---|---:|---|
 | Store observation | 320 | Operating state, availability, price, and store coverage |
 | Synthetic consumer panel | 256 | Pre-order journey, price, and throughput proxy |
@@ -47,6 +48,16 @@ The current implementation produces one aggregate evidence receipt per family:
 five `Evidence` objects in total. The 1,024 probes are aggregate plan quotas
 represented by those receipts; the demo does not claim to execute or persist
 1,024 independent Agent conversations or raw observations.
+
+Each task is executed separately through the synthetic Agent Executor. Before
+an adapter can run, the executor resolves the assigned specialist, checks the
+task tool against that role's allowlist, requires declared guardrails, and
+enforces a `SIMULATED_ONLY` boundary. The adapter must return the declared
+logical category, agent, tool and sample allocation with a valid content hash.
+The event ledger records the dispatch, policy check, receipt and completion for
+all five tasks. This proves task-level orchestration and runtime policy
+enforcement inside the synthetic fixture; it does not prove real-world
+observation.
 
 “Evidence family” means a logical category and calculation entry point. All
 five families share one synthetic fixture. Their statistical independence,
@@ -170,11 +181,11 @@ DeepSeek is an optional bounded language layer for three operations:
 - `CHALLENGE`: phrase the already-fixed 20% counter-hypothesis;
 - `EXPLANATION`: explain deterministic findings and next actions.
 
-The model does not generate evidence, measurements, hashes, intervals,
-confidence, verdicts, or replay parameters. Responses must be strict JSON and
-pass Zod validation. Requests use a 4.5-second timeout, one short retry for
-network, 429, or 5xx failures, and a deterministic fallback. Provenance exposes
-provider, model, operation, attempts, and `LIVE` or
+The model does not generate evidence, measurements, hashes, fixed scenario
+bands, heuristic policy scores, verdicts, or replay parameters. Responses must
+be strict JSON and pass Zod validation. Requests use a 4.5-second timeout, one
+short retry for network, 429, or 5xx failures, and a deterministic fallback.
+Provenance exposes provider, model, operation, attempts, and `LIVE` or
 `DETERMINISTIC_FALLBACK`; application responses and events never expose the API
 key, authorization header, or prompts. Prompts are still transmitted to
 DeepSeek in LIVE mode. The application does not persist them beyond in-memory
@@ -185,13 +196,14 @@ provider or hosting platform.
 
 The test suite verifies:
 
-- 48 fictional stores and exactly 1,024 planned probes;
+- 48 fictional stores and a declared aggregate quota of 1,024;
 - canonical base and replay values;
 - identical core numeric results for the same code version, seed, and
   hypothesis;
 - content-hash reconstruction for every evidence receipt;
 - the two-family minimum for high-confidence findings;
 - REST state transitions and validation;
+- task-level agent dispatch, tool-policy checks and blocked unauthorized tools;
 - ordered server-sent events;
 - no-key DeepSeek fallback, strict JSON parsing, provenance, and retry behavior.
 

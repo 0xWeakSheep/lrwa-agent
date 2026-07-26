@@ -22,9 +22,9 @@ import {
   createMorrowCase,
   deterministicId,
   deterministicTime,
-  generateEvidence,
   verifyEvidenceHash,
 } from './reality-twin';
+import { SyntheticAgentExecutorService } from './synthetic-agent-executor.service';
 
 export interface DemoCaseBundle {
   case: DemoCase;
@@ -49,7 +49,10 @@ export class InvestigationService {
     InvestigationEvent[]
   >();
 
-  constructor(private readonly deepSeekService: DeepSeekService) {}
+  constructor(
+    private readonly deepSeekService: DeepSeekService,
+    private readonly agentExecutor: SyntheticAgentExecutorService,
+  ) {}
 
   createDemoCase(seed = 'morrow-demo-2026'): DemoCaseBundle {
     const demoCase = createMorrowCase(seed);
@@ -189,7 +192,7 @@ export class InvestigationService {
       investigation,
       'PLAN_PROPOSED',
       'SUPERVISOR',
-      '调查主管提出 1,024 探针、五路交叉验证计划，等待人工批准。',
+      '调查主管提出聚合配额为 1,024 的五类证据计划，等待调用方触发演示交互门。',
       {
         tasks: tasks.length,
         totalProbes: 1024,
@@ -211,8 +214,13 @@ export class InvestigationService {
       investigation,
       'PLAN_APPROVED',
       'SUPERVISOR',
-      '人工审批已通过；调查仍限定在 SIMULATED 环境。',
-      { planId: investigation.plan.id },
+      '调用方已触发演示交互门；调查仍限定在 SIMULATED 环境，未进行身份验证。',
+      {
+        planId: investigation.plan.id,
+        callerInteractionRecorded: true,
+        approvalControl: 'UNAUTHENTICATED_DEMO_GATE',
+        identityVerified: false,
+      },
     );
     return investigation;
   }
@@ -231,6 +239,7 @@ export class InvestigationService {
       { planId: investigation.plan?.id ?? '' },
     );
 
+    const evidence: Evidence[] = [];
     for (const task of investigation.plan?.tasks ?? []) {
       const role =
         investigation.agents.find((agent) => agent.id === task.agentId)?.role ??
@@ -242,33 +251,61 @@ export class InvestigationService {
         `${role} 已接收 ${task.evidenceFamily} 任务。`,
         { taskId: task.id, sampleSize: task.sampleSize },
       );
+      const execution = this.agentExecutor.executeTask({
+        demoCase,
+        investigationId: investigation.id,
+        seed: investigation.seed,
+        agents: investigation.agents,
+        task,
+        corporateOrderShare: investigation.hypothesis?.corporateOrderShare ?? 0,
+      });
+      this.recordEvent(
+        investigation,
+        'TOOL_POLICY_CHECKED',
+        role,
+        `${task.tool} 已通过 ${role} 的工具策略与 SIMULATED 边界检查。`,
+        {
+          taskId: task.id,
+          tool: task.tool,
+          boundary: execution.policy.boundary,
+          toolAllowed: execution.policy.toolAllowed,
+          guardrailsApplied: execution.policy.guardrailsApplied,
+          identityImpersonationAllowed:
+            execution.policy.identityImpersonationAllowed,
+          externalContactAllowed: execution.policy.externalContactAllowed,
+        },
+      );
+      evidence.push(execution.evidence);
+      this.recordEvent(
+        investigation,
+        'EVIDENCE_CAPTURED',
+        execution.agent.role,
+        `${execution.evidence.source.family} 聚合证据已写入可追溯记录。`,
+        {
+          taskId: task.id,
+          evidenceId: execution.evidence.id,
+          evidenceHash: execution.evidence.hash,
+          sourceLabel: execution.evidence.source.label,
+        },
+      );
+      this.recordEvent(
+        investigation,
+        'AGENT_TASK_COMPLETED',
+        execution.agent.role,
+        `${execution.agent.role} 已完成 ${task.evidenceFamily} 合成任务并返回一份聚合回执。`,
+        {
+          taskId: task.id,
+          evidenceId: execution.evidence.id,
+          sampleSize: execution.evidence.sampleSize,
+        },
+      );
     }
 
-    const evidence = generateEvidence(
-      demoCase,
-      investigation.id,
-      investigation.seed,
-      investigation.agents,
-      investigation.hypothesis?.corporateOrderShare ?? 0,
-    );
     const hashesVerified = evidence.every(verifyEvidenceHash);
     if (!hashesVerified) {
       throw new ConflictException('Evidence hash verification failed');
     }
     this.evidenceByInvestigation.set(investigation.id, evidence);
-    for (const item of evidence) {
-      this.recordEvent(
-        investigation,
-        'EVIDENCE_CAPTURED',
-        item.agent.role,
-        `${item.source.family} 聚合证据已写入可追溯记录。`,
-        {
-          evidenceId: item.id,
-          evidenceHash: item.hash,
-          sourceLabel: item.source.label,
-        },
-      );
-    }
     this.recordEvent(
       investigation,
       'EVIDENCE_AUDITED',
@@ -327,14 +364,14 @@ export class InvestigationService {
         systemPrompt:
           'You are the skeptic in a synthetic investment due-diligence demo. Return exactly one JSON object shaped as {"content":"short challenge","suggestions":["short action"]}. Use one to three suggestion strings, no extra keys and no markdown. Challenge the conclusion without changing any computed values.',
         userPrompt:
-          'The deterministic pipeline estimates fictional Morrow June GMV at ¥1.92m versus ¥3.33m reported, with a ¥1.72m–¥2.14m interval, 42.3% gap, and 0.88 confidence. Frame the pre-approved counter-hypothesis that 20% of orders may be unobserved corporate orders. It must require human approval before replay.',
+          'The deterministic pipeline estimates fictional Morrow June GMV at ¥1.92m versus ¥3.33m reported, with a fixed ¥1.72m–¥2.14m scenario band, 42.3% gap, and 0.88 heuristic policy score. Frame the preconfigured counter-hypothesis that 20% of orders may be unobserved corporate orders. State that a separate caller interaction is required before replay and do not imply identity verification.',
         schema: insightSchema,
         fallback: {
           content:
             '公开触点可能遗漏企业团购订单；建议用 20% 隐含占比检验这一替代解释。',
           suggestions: [
-            '在人工批准后以相同 seed 重放。',
-            '记录假设参数并比较 GMV 区间、差距和置信度。',
+            '由调用方通过独立演示交互门启动相同 seed 的重放。',
+            '记录假设参数并比较 GMV 固定情景带、差距和启发式策略分数。',
           ],
         },
       });
@@ -362,7 +399,9 @@ export class InvestigationService {
         '反方审查员提出：是否存在未被公开触点观察到的 20% 企业团购订单？',
         {
           corporateOrderShare: 0.2,
-          approvalRequired: true,
+          callerInteractionRequired: true,
+          approvalControl: 'UNAUTHENTICATED_DEMO_GATE',
+          identityVerified: false,
           autoReplayBlocked: true,
         },
       );
@@ -455,7 +494,7 @@ export class InvestigationService {
           ...hypothesis,
           status:
             hypothesis.corporateOrderShare === corporateOrderShare
-              ? ('APPROVED' as const)
+              ? ('CALLER_CONFIRMED' as const)
               : hypothesis.status,
         }),
       ),
@@ -501,11 +540,13 @@ export class InvestigationService {
       replay,
       'REPLAY_STARTED',
       'SUPERVISOR',
-      '人工批准反方假设；使用相同现实 seed 和经审计参数重新运行。',
+      '调用方通过独立演示交互门提交反方参数；使用相同 Reality Twin seed 重新运行。',
       {
         corporateOrderShare,
-        humanApproved: true,
-        auditedInput: true,
+        callerInteractionRecorded: true,
+        approvalControl: 'UNAUTHENTICATED_DEMO_GATE',
+        identityVerified: false,
+        validatedInput: true,
         reproducible: true,
       },
     );

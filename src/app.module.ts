@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { InvestigationController } from './investigation/investigation.controller';
 import { InvestigationService } from './investigation/investigation.service';
+import { SyntheticAgentExecutorService } from './investigation/synthetic-agent-executor.service';
 import {
   DEEPSEEK_FETCH,
   DeepSeekService,
@@ -16,6 +17,7 @@ const nativeFetch: FetchLike = (input, init) => fetch(input, init);
   controllers: [AppController, InvestigationController],
   providers: [
     InvestigationService,
+    SyntheticAgentExecutorService,
     DeepSeekService,
     { provide: DEEPSEEK_FETCH, useValue: nativeFetch },
   ],

@@ -8,6 +8,7 @@ import type {
   Evidence,
   EvidenceFamily,
   Finding,
+  PlanTask,
   StoreSignal,
 } from '../domain/types';
 
@@ -139,7 +140,7 @@ export function createAgentTeam(seed: string): AgentDefinition[] {
     {
       role: 'SUPERVISOR',
       displayName: 'Lin / 调查主管',
-      mission: '审批方法、调度专业 Agent，并执行多类证据交叉验证。',
+      mission: '锁定方法边界、调度专业 Agent，并执行多类证据交叉验证。',
       allowedTools: ['policy-engine', 'evidence-ledger', 'confidence-model'],
       guardrails: [
         '只允许访问虚构 Reality Twin',
@@ -202,7 +203,7 @@ export function createAgentTeam(seed: string): AgentDefinition[] {
       mission: '主动挑战初步结论，提出可审计、可重放的替代解释。',
       allowedTools: ['hypothesis-register', 'counterfactual-planner'],
       guardrails: [
-        '只能提出假设，不能绕过人工审批启动重放',
+        '只能提出假设，必须经过单独调用方交互门启动重放；当前演示不验证身份',
         '所有参数必须留痕',
       ],
     },
@@ -313,13 +314,11 @@ function agentFor(
   return agent;
 }
 
-export function generateEvidence(
+function createEvidenceDrafts(
   demoCase: DemoCase,
-  investigationId: string,
   seed: string,
-  agents: AgentDefinition[],
   corporateOrderShare = 0,
-): Evidence[] {
+): EvidenceDraft[] {
   const storeSignals = createStoreSignals(demoCase.stores, seed);
   const gmvMultiplier = 1 / (1 - corporateOrderShare);
   const gmvEstimates = [
@@ -425,33 +424,92 @@ export function generateEvidence(
     },
   ];
 
-  return drafts.map((draft, index) => {
-    const agent = agentFor(agents, draft.agentRole);
-    const payload = {
-      id: deterministicId('evd', {
-        investigationId,
-        family: draft.family,
-      }),
+  return drafts;
+}
+
+function evidenceFromDraft(
+  demoCase: DemoCase,
+  investigationId: string,
+  seed: string,
+  agents: AgentDefinition[],
+  draft: EvidenceDraft,
+  index: number,
+): Evidence {
+  const agent = agentFor(agents, draft.agentRole);
+  const payload = {
+    id: deterministicId('evd', {
       investigationId,
-      claimIds: demoCase.claims
-        .filter((claim) => draft.claimMetrics.includes(claim.metric))
-        .map((claim) => claim.id),
-      source: {
-        label: 'SIMULATED' as const,
-        family: draft.family,
-        name: draft.sourceName,
-        methodology: draft.methodology,
-      },
-      agent: { id: agent.id, role: agent.role },
-      tool: draft.tool,
-      sampleSize: draft.sampleSize,
-      collectedAt: deterministicTime(seed, 20 + index),
-      measurements: draft.measurements,
-      ...(draft.storeSignals ? { storeSignals: draft.storeSignals } : {}),
-      summary: draft.summary,
-    };
-    return { ...payload, hash: stableHash(payload) };
-  });
+      family: draft.family,
+    }),
+    investigationId,
+    claimIds: demoCase.claims
+      .filter((claim) => draft.claimMetrics.includes(claim.metric))
+      .map((claim) => claim.id),
+    source: {
+      label: 'SIMULATED' as const,
+      family: draft.family,
+      name: draft.sourceName,
+      methodology: draft.methodology,
+    },
+    agent: { id: agent.id, role: agent.role },
+    tool: draft.tool,
+    sampleSize: draft.sampleSize,
+    collectedAt: deterministicTime(seed, 20 + index),
+    measurements: draft.measurements,
+    ...(draft.storeSignals ? { storeSignals: draft.storeSignals } : {}),
+    summary: draft.summary,
+  };
+  return { ...payload, hash: stableHash(payload) };
+}
+
+export function generateEvidenceForTask(
+  demoCase: DemoCase,
+  investigationId: string,
+  seed: string,
+  agents: AgentDefinition[],
+  task: PlanTask,
+  corporateOrderShare = 0,
+): Evidence {
+  const drafts = createEvidenceDrafts(demoCase, seed, corporateOrderShare);
+  const index = drafts.findIndex(
+    (candidate) => candidate.family === task.evidenceFamily,
+  );
+  const draft = drafts[index];
+  if (!draft) {
+    throw new Error(`No synthetic evidence adapter for ${task.evidenceFamily}`);
+  }
+  const expectedAgent = agentFor(agents, draft.agentRole);
+  if (task.agentId !== expectedAgent.id) {
+    throw new Error(
+      `Task ${task.id} is assigned to an agent that cannot execute ${task.evidenceFamily}`,
+    );
+  }
+  if (task.tool !== draft.tool || task.sampleSize !== draft.sampleSize) {
+    throw new Error(
+      `Task ${task.id} does not match the declared synthetic adapter`,
+    );
+  }
+  return evidenceFromDraft(
+    demoCase,
+    investigationId,
+    seed,
+    agents,
+    draft,
+    index,
+  );
+}
+
+export function generateEvidence(
+  demoCase: DemoCase,
+  investigationId: string,
+  seed: string,
+  agents: AgentDefinition[],
+  corporateOrderShare = 0,
+): Evidence[] {
+  return createEvidenceDrafts(demoCase, seed, corporateOrderShare).map(
+    (draft, index) =>
+      evidenceFromDraft(demoCase, investigationId, seed, agents, draft, index),
+  );
 }
 
 function boundsFor(

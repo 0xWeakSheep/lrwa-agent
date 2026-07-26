@@ -43,7 +43,7 @@ describe('seeded Morrow reality twin', () => {
     expect(secondFindings).toEqual(firstFindings);
   });
 
-  it('produces the canonical Morrow estimate from 1,024 probes', () => {
+  it('produces the canonical Morrow estimate from the 1,024-unit planned quota', () => {
     const evidence = generateEvidence(demoCase, investigationId, seed, agents);
     const findings = computeFindings(demoCase, investigationId, evidence);
     const monthlyClaim = demoCase.claims.find(
@@ -76,7 +76,7 @@ describe('seeded Morrow reality twin', () => {
     });
   });
 
-  it('raises GMV and widens uncertainty under the approved hypothesis', () => {
+  it('raises GMV and widens uncertainty under the caller-confirmed hypothesis', () => {
     const baseEvidence = generateEvidence(
       demoCase,
       investigationId,

@@ -147,6 +147,8 @@ export type EventType =
   | 'PLAN_APPROVED'
   | 'INVESTIGATION_STARTED'
   | 'AGENT_DISPATCHED'
+  | 'TOOL_POLICY_CHECKED'
+  | 'AGENT_TASK_COMPLETED'
   | 'EVIDENCE_CAPTURED'
   | 'EVIDENCE_AUDITED'
   | 'ESTIMATE_COMPUTED'
@@ -210,7 +212,7 @@ export interface Investigation {
     corporateOrderShare: number;
     rationale: string;
     proposedBy: 'SKEPTIC';
-    status: 'PROPOSED' | 'APPROVED';
+    status: 'PROPOSED' | 'CALLER_CONFIRMED';
     disclosure: SimulationLabel;
   }>;
   hypothesis?: {

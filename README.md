@@ -3,7 +3,7 @@
 Backend for **LRWA — Live Real-World Assurance / 现实验证引擎**. This NestJS
 hackathon demo investigates the entirely fictional **晨潮咖啡 Morrow** inside a
 deterministic Reality Twin, producing traceable evidence, cross-validated
-findings and a human-approved counterfactual replay.
+findings and a caller-gated counterfactual replay.
 
 > Synthetic-only boundary: every case, store, probe, event, source and evidence
 > item is `SIMULATED`. The demo never impersonates a real person, contacts a
@@ -16,9 +16,9 @@ findings and a human-approved counterfactual replay.
 - Public product demo:
   https://lrwa-agent-web.cheeky-angel-7701.chatgpt.site
 - 90-second demo film:
-  https://lrwa-agent-web.cheeky-angel-7701.chatgpt.site/materials/LRWA_OpenArena_Demo_90s.mp4
+  https://raw.githubusercontent.com/0xWeakSheep/lrwa-agent-web/main/public/materials/LRWA_OpenArena_Demo_90s.mp4
 - Public pitch deck:
-  https://lrwa-agent-web.cheeky-angel-7701.chatgpt.site/materials/LRWA_Seed_Deck.pdf
+  https://raw.githubusercontent.com/0xWeakSheep/lrwa-agent-web/main/public/materials/LRWA_Seed_Deck.pdf
 - Next.js frontend:
   https://github.com/0xWeakSheep/lrwa-agent-web
 
@@ -33,24 +33,26 @@ npm run start:dev
 The default API is `http://localhost:3001/v1`; `PORT` can override it. No API
 key or external service is required.
 
-For the exact demo formulas, confidence policy, replay behavior, limitations,
-and production calibration path, see [METHODOLOGY.md](./METHODOLOGY.md).
+For the exact demo formulas, heuristic policy score, replay behavior,
+limitations, and production calibration path, see
+[METHODOLOGY.md](./METHODOLOGY.md).
 
 ## DeepSeek language layer
 
 DeepSeek optionally powers three bounded language tasks:
 
-- `PLAN`: explains the fixed five-family, 1,024-probe investigation plan.
+- `PLAN`: explains the five-category plan and its declared aggregate quota of
+  1,024.
 - `CHALLENGE`: helps the Skeptic articulate the fixed 20% corporate-order
   counter-hypothesis.
 - `EXPLANATION`: explains deterministic findings and next actions.
 
-It never generates evidence, measurements, hashes, intervals, confidence,
-verdicts or replay parameters. Those remain in the seeded deterministic
-pipeline. If `DEEPSEEK_API_KEY` is absent, times out, returns invalid JSON, is
-rate-limited or has an upstream failure, the same API flow completes with
-deterministic local language. HTTP 429 and 5xx responses receive one short
-retry.
+It never generates evidence, measurements, hashes, fixed scenario bands,
+heuristic policy scores, verdicts or replay parameters. Those remain in the
+seeded deterministic pipeline. If `DEEPSEEK_API_KEY` is absent, times out,
+returns invalid JSON, is rate-limited or has an upstream failure, the same API
+flow completes with deterministic local language. HTTP 429 and 5xx responses
+receive one short retry.
 
 The demo requests non-thinking JSON mode with a 512-token ceiling so the live
 language layer stays fast and bounded.
@@ -80,9 +82,26 @@ LRWA estimates 39 active stores and June GMV of ¥1.92m within a fixed
 
 The Evidence Auditor verifies provenance and hashes, the Statistician computes
 the estimates, and the Skeptic challenges the result with an unobserved 20%
-corporate-order hypothesis. It cannot rerun autonomously: a human must approve
-the replay. The hypothesis raises estimated GMV to ¥2.40m, changes the interval
-and gap, but the reported GMV remains `UNSUPPORTED`.
+corporate-order hypothesis. It cannot rerun autonomously: a separate
+unauthenticated UI/API interaction starts the deterministic replay. Production
+would require identity-verified approval. The hypothesis raises estimated GMV
+to ¥2.40m, changes the fixed scenario band and gap, but the reported GMV
+remains `UNSUPPORTED`.
+
+## Synthetic Agent Executor
+
+The demo now executes each of the five plan tasks separately through a
+`SyntheticAgentExecutorService`. For every task, the executor resolves the
+assigned specialist, checks that the requested tool appears in that role's
+allowlist, requires declared guardrails, enforces the `SIMULATED_ONLY`
+boundary, invokes the matching deterministic adapter, and validates the
+returned family, agent, tool, sample allocation and SHA-256 receipt hash.
+
+The event ledger records `AGENT_DISPATCHED`, `TOOL_POLICY_CHECKED`,
+`EVIDENCE_CAPTURED`, and `AGENT_TASK_COMPLETED` for each task. This is a real
+task-level orchestration and policy-enforcement path over synthetic adapters;
+it is not a claim that five independent real-world agents or 1,024 live
+observations ran.
 
 ## Exact curl flow
 
@@ -108,7 +127,7 @@ curl -sS \
 curl -N \
   "http://localhost:3001/v1/investigations/$investigation_id/events"
 
-# Human approval of the Skeptic's proposed hypothesis:
+# Explicit demo interaction for the Skeptic's proposed hypothesis:
 replay_json=$(curl -sS -X POST \
   "http://localhost:3001/v1/investigations/$investigation_id/replay" \
   -H 'content-type: application/json' \
@@ -127,9 +146,11 @@ The supervisor state machine is:
 DRAFT -> PLANNED -> APPROVED -> RUNNING -> COMPLETED
 ```
 
-`start` completes synchronously for a reliable live demo. SSE replays the
-complete ordered event ledger, including `HYPOTHESIS_RAISED` on the initial run
-and `REPLAY_STARTED` only after human approval.
+`APPROVED` is an internal workflow state name, not proof of identity or a
+compliance-grade approval. `start` completes synchronously for a reliable live
+demo. SSE replays the complete ordered event ledger, including
+`HYPOTHESIS_RAISED` on the initial run and `REPLAY_STARTED` only after the
+separate caller interaction.
 
 ## API
 
@@ -138,8 +159,8 @@ and `REPLAY_STARTED` only after human approval.
 | `GET` | `/v1` | Health and simulation mode |
 | `POST` | `/v1/demo/cases` | `{ case, investigation }` |
 | `GET` | `/v1/cases/:caseId` | `DemoCase`, including 48 synthetic map stores |
-| `POST` | `/v1/investigations/:id/plan` | Plan with 5 tasks / 1,024 probes |
-| `POST` | `/v1/investigations/:id/approve` | Approved investigation |
+| `POST` | `/v1/investigations/:id/plan` | Plan with 5 tasks and a declared aggregate quota of 1,024 |
+| `POST` | `/v1/investigations/:id/approve` | Records the demo interaction gate and moves to `APPROVED` |
 | `POST` | `/v1/investigations/:id/start` | Completed initial investigation |
 | `POST` | `/v1/investigations/:id/replay` | Body `{ corporateOrderShare: 0..0.5 }` |
 | `GET` | `/v1/investigations/:id` | Investigation and hypothesis audit |
@@ -177,10 +198,12 @@ npm run test:e2e -- --runInBand
 npm run build
 ```
 
-Tests cover the canonical values, 48 map stores, exactly 1,024 probes, seeded
-reproducibility, evidence hash traceability, the confidence gate, REST state
-transitions, SSE, hypothesis validation, changed replay results, no-key
-fallback, live JSON parsing, provenance and retry behavior.
+Tests cover the canonical values, 48 map stores, the declared aggregate quota
+of 1,024, five aggregate receipts, task-level tool policy enforcement, blocked
+unauthorized tools, seeded reproducibility, evidence hash traceability, the
+heuristic policy gate, REST state transitions, SSE, hypothesis validation,
+changed replay results, no-key fallback, live JSON parsing, provenance and
+retry behavior.
 
 ## Container deployment
 

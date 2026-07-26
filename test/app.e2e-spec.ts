@@ -161,6 +161,12 @@ describe('LRWA demo API (e2e)', () => {
         expect(text).toContain('SIMULATED');
         expect(text).toContain('"logicalEvidenceFamilies":5');
         expect(text).toContain('"hashesVerified":true');
+        expect(text.match(/^event: TOOL_POLICY_CHECKED$/gm)).toHaveLength(5);
+        expect(text.match(/^event: AGENT_TASK_COMPLETED$/gm)).toHaveLength(5);
+        expect(text).toContain('"boundary":"SIMULATED_ONLY"');
+        expect(text).toContain('"toolAllowed":true');
+        expect(text).toContain('"identityImpersonationAllowed":false');
+        expect(text).toContain('"externalContactAllowed":false');
       });
 
     const replayed = await request(app.getHttpServer())
@@ -188,7 +194,10 @@ describe('LRWA demo API (e2e)', () => {
       .expect(200)
       .expect(({ text }) => {
         expect(text).toContain('REPLAY_STARTED');
-        expect(text).toContain('"humanApproved":true');
+        expect(text).toContain('"callerInteractionRecorded":true');
+        expect(text).toContain('"approvalControl":"UNAUTHENTICATED_DEMO_GATE"');
+        expect(text).toContain('"identityVerified":false');
+        expect(text).not.toContain('humanApproved');
         expect(text).toContain('"corporateOrderShare":0.2');
       });
 
