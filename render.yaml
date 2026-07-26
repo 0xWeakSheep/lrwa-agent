@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: lrwa-agent
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /v1
+    envVars:
+      - key: PORT
+        value: 10000
