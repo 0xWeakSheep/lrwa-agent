@@ -229,6 +229,21 @@ export class InvestigationService {
     const investigation = this.requireInvestigation(investigationId);
     this.assertStatus(investigation, 'APPROVED');
     const demoCase = this.requireCase(investigation.caseId);
+    const taskExecutions = (investigation.plan?.tasks ?? []).map((task) => {
+      const role =
+        investigation.agents.find((agent) => agent.id === task.agentId)?.role ??
+        'SUPERVISOR';
+      const execution = this.agentExecutor.executeTask({
+        demoCase,
+        investigationId: investigation.id,
+        seed: investigation.seed,
+        agents: investigation.agents,
+        task,
+        corporateOrderShare: investigation.hypothesis?.corporateOrderShare ?? 0,
+      });
+      return { task, role, execution };
+    });
+
     investigation.status = 'RUNNING';
     investigation.startedAt = deterministicTime(investigation.seed, 10);
     this.recordEvent(
@@ -240,10 +255,7 @@ export class InvestigationService {
     );
 
     const evidence: Evidence[] = [];
-    for (const task of investigation.plan?.tasks ?? []) {
-      const role =
-        investigation.agents.find((agent) => agent.id === task.agentId)?.role ??
-        'SUPERVISOR';
+    for (const { task, role, execution } of taskExecutions) {
       this.recordEvent(
         investigation,
         'AGENT_DISPATCHED',
@@ -251,14 +263,6 @@ export class InvestigationService {
         `${role} 已接收 ${task.evidenceFamily} 任务。`,
         { taskId: task.id, sampleSize: task.sampleSize },
       );
-      const execution = this.agentExecutor.executeTask({
-        demoCase,
-        investigationId: investigation.id,
-        seed: investigation.seed,
-        agents: investigation.agents,
-        task,
-        corporateOrderShare: investigation.hypothesis?.corporateOrderShare ?? 0,
-      });
       this.recordEvent(
         investigation,
         'TOOL_POLICY_CHECKED',
@@ -269,7 +273,7 @@ export class InvestigationService {
           tool: task.tool,
           boundary: execution.policy.boundary,
           toolAllowed: execution.policy.toolAllowed,
-          guardrailsApplied: execution.policy.guardrailsApplied,
+          guardrailsDeclared: execution.policy.guardrailsDeclared,
           identityImpersonationAllowed:
             execution.policy.identityImpersonationAllowed,
           externalContactAllowed: execution.policy.externalContactAllowed,

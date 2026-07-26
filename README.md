@@ -99,9 +99,10 @@ returned family, agent, tool, sample allocation and SHA-256 receipt hash.
 
 The event ledger records `AGENT_DISPATCHED`, `TOOL_POLICY_CHECKED`,
 `EVIDENCE_CAPTURED`, and `AGENT_TASK_COMPLETED` for each task. This is a real
-task-level orchestration and policy-enforcement path over synthetic adapters;
-it is not a claim that five independent real-world agents or 1,024 live
-observations ran.
+task-level orchestration path with tool-allowlist, declared-guardrail, and
+synthetic-boundary checks over deterministic adapters; it is not a claim that
+the guardrail text was independently enforced, or that five independent
+real-world agents or 1,024 live observations ran.
 
 ## Exact curl flow
 

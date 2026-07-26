@@ -51,13 +51,15 @@ represented by those receipts; the demo does not claim to execute or persist
 
 Each task is executed separately through the synthetic Agent Executor. Before
 an adapter can run, the executor resolves the assigned specialist, checks the
-task tool against that role's allowlist, requires declared guardrails, and
-enforces a `SIMULATED_ONLY` boundary. The adapter must return the declared
-logical category, agent, tool and sample allocation with a valid content hash.
-The event ledger records the dispatch, policy check, receipt and completion for
-all five tasks. This proves task-level orchestration and runtime policy
-enforcement inside the synthetic fixture; it does not prove real-world
-observation.
+task tool against that role's allowlist, requires a non-empty declared
+guardrail manifest, and restricts execution to a `SIMULATED` case and matching
+deterministic adapter. The adapter must return the declared logical category,
+agent, tool and sample allocation with a valid content hash. The event ledger
+records the dispatch, policy check, declared guardrail count, receipt and
+completion for all five tasks. This proves task-level orchestration,
+tool-allowlist checks and a synthetic adapter boundary; it does not prove that
+free-text guardrails were independently enforced or that real-world
+observation occurred.
 
 “Evidence family” means a logical category and calculation entry point. All
 five families share one synthetic fixture. Their statistical independence,
@@ -72,7 +74,8 @@ Each receipt records:
 - responsible agent and tool;
 - sample size and deterministic collection time;
 - aggregate measurements;
-- a SHA-256 hash of the canonical JSON payload.
+- a SHA-256 hash of the exact `JSON.stringify` payload produced by this code
+  version.
 
 At runtime the Evidence Auditor recomputes each
 `SHA-256(JSON.stringify(payload))` value before findings are calculated. These

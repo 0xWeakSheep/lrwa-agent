@@ -14,7 +14,7 @@ export interface SyntheticAgentExecution {
   policy: {
     boundary: 'SIMULATED_ONLY';
     toolAllowed: true;
-    guardrailsApplied: number;
+    guardrailsDeclared: number;
     identityImpersonationAllowed: false;
     externalContactAllowed: false;
   };
@@ -93,7 +93,7 @@ export class SyntheticAgentExecutorService {
       policy: {
         boundary: 'SIMULATED_ONLY',
         toolAllowed: true,
-        guardrailsApplied: agent.guardrails.length,
+        guardrailsDeclared: agent.guardrails.length,
         identityImpersonationAllowed: false,
         externalContactAllowed: false,
       },

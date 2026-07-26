@@ -44,7 +44,7 @@ describe('SyntheticAgentExecutorService', () => {
       identityImpersonationAllowed: false,
       externalContactAllowed: false,
     });
-    expect(result.policy.guardrailsApplied).toBeGreaterThan(0);
+    expect(result.policy.guardrailsDeclared).toBeGreaterThan(0);
   });
 
   it('blocks a tool that is not allowed for the assigned agent', () => {
