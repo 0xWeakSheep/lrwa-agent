@@ -18,7 +18,7 @@ findings and a caller-gated counterfactual replay.
 - 90-second demo film:
   https://cdn.jsdelivr.net/gh/0xWeakSheep/lrwa-agent-web@11a13d001444f047ff3582870b2f3f6adb6f6c60/public/materials/LRWA_OpenArena_Demo_90s_web.mp4
 - Public pitch deck:
-  https://cdn.jsdelivr.net/gh/0xWeakSheep/lrwa-agent-web@11a13d001444f047ff3582870b2f3f6adb6f6c60/public/materials/LRWA_Seed_Deck.pdf
+  https://cdn.jsdelivr.net/gh/0xWeakSheep/lrwa-agent-web@6e98567e579c0c967c68729f6231cfe09480926d/public/materials/LRWA_Seed_Deck.pdf
 - Next.js frontend:
   https://github.com/0xWeakSheep/lrwa-agent-web
 
