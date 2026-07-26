@@ -33,6 +33,9 @@ npm run start:dev
 The default API is `http://localhost:3001/v1`; `PORT` can override it. No API
 key or external service is required.
 
+For the exact demo formulas, confidence policy, replay behavior, limitations,
+and production calibration path, see [METHODOLOGY.md](./METHODOLOGY.md).
+
 ## DeepSeek language layer
 
 DeepSeek optionally powers three bounded language tasks:
@@ -69,9 +72,11 @@ mode. The default is `deepseek-v4-flash`; the deprecated legacy
 ## Canonical Morrow story
 
 Management reports 48 operating stores, 118 daily orders per store, an average
-ticket of ¥19.6 and June GMV of ¥3.33m. Five independent evidence families use
-exactly 1,024 parameterized probes. LRWA estimates 39 active stores and June
-GMV of ¥1.92m (¥1.72m–¥2.14m), a 42.3% gap at 0.88 confidence.
+ticket of ¥19.6 and June GMV of ¥3.33m. Five logical evidence families
+represent a fixed aggregate quota of 1,024 parameterized probes. The demo
+generates five aggregate evidence receipts, not 1,024 stored raw observations.
+LRWA estimates 39 active stores and June GMV of ¥1.92m within a fixed
+¥1.72m–¥2.14m scenario band, a 42.3% gap at a 0.88 heuristic policy score.
 
 The Evidence Auditor verifies provenance and hashes, the Statistician computes
 the estimates, and the Skeptic challenges the result with an unobserved 20%
@@ -150,8 +155,10 @@ and unknown entities return `404`.
 - Every evidence item records `SIMULATED`, source family and methodology,
   agent, tool, sample size and SHA-256 content hash.
 - Store observation, synthetic consumer panel, digital footprint, labor and
-  supply-chain signals are independent evidence families.
-- High confidence requires at least two independent evidence families.
+  supply-chain signals are different logical evidence families; statistical
+  independence is not claimed.
+- The demo's `HIGH` policy band requires at least two logical evidence
+  families.
 - The same seed and same hypothesis produce identical measurements, findings
   and replay identity.
 - The replay request is validated, recorded on the investigation, and emitted

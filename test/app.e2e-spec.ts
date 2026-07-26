@@ -132,9 +132,7 @@ describe('LRWA demo API (e2e)', () => {
     const findings = findingsResponse.body as unknown as Finding[];
     expect(findings).toHaveLength(4);
     expect(
-      findings.every(
-        (finding) => finding.independentEvidenceFamilies.length >= 2,
-      ),
+      findings.every((finding) => finding.evidenceFamilies.length >= 2),
     ).toBe(true);
     const baseGmv = findings.find(
       (finding) => finding.reportedValue === 3_330_000,
@@ -161,6 +159,8 @@ describe('LRWA demo API (e2e)', () => {
         expect(text).not.toContain('Bearer ');
         expect(text).toContain('SKEPTIC');
         expect(text).toContain('SIMULATED');
+        expect(text).toContain('"logicalEvidenceFamilies":5');
+        expect(text).toContain('"hashesVerified":true');
       });
 
     const replayed = await request(app.getHttpServer())

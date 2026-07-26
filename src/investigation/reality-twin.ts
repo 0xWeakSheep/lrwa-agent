@@ -119,6 +119,11 @@ export function stableHash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
+export function verifyEvidenceHash(evidence: Evidence): boolean {
+  const { hash, ...payload } = evidence;
+  return hash === stableHash(payload);
+}
+
 export function deterministicId(prefix: string, value: unknown): string {
   return `${prefix}_${stableHash(value).slice(0, 12)}`;
 }
@@ -134,12 +139,12 @@ export function createAgentTeam(seed: string): AgentDefinition[] {
     {
       role: 'SUPERVISOR',
       displayName: 'Lin / 调查主管',
-      mission: '审批方法、调度专业 Agent，并执行独立证据交叉验证。',
+      mission: '审批方法、调度专业 Agent，并执行多类证据交叉验证。',
       allowedTools: ['policy-engine', 'evidence-ledger', 'confidence-model'],
       guardrails: [
         '只允许访问虚构 Reality Twin',
         '不冒充真人或联系真实商户',
-        '高置信结论至少需要两个独立证据族',
+        '高置信结论至少需要两个逻辑证据族',
       ],
     },
     {
@@ -187,7 +192,7 @@ export function createAgentTeam(seed: string): AgentDefinition[] {
     {
       role: 'STATISTICIAN',
       displayName: 'Sigma / 统计分析师',
-      mission: '聚合独立证据族，计算现实估计、区间、差距与置信度。',
+      mission: '聚合不同逻辑证据族，计算现实估计、情景范围、差距与政策分数。',
       allowedTools: ['confidence-model', 'interval-estimator'],
       guardrails: ['不得用单一证据族输出高置信结论', '保留计算口径'],
     },
@@ -539,7 +544,7 @@ export function computeFindings(
       verdict,
       confidence,
       confidenceBand,
-      independentEvidenceFamilies: families,
+      evidenceFamilies: families,
       evidenceIds: relevant.map((item) => item.id),
       reportedValue: claim.reportedValue,
       estimatedValue,
@@ -548,8 +553,8 @@ export function computeFindings(
       gapPercent,
       rationale:
         confidenceBand === 'HIGH'
-          ? `${families.length} 个独立证据族交叉验证；现实估计与披露值相差 ${gapPercent}%。`
-          : `仅有 ${families.length} 个独立证据族，按政策不得输出高置信结论。`,
+          ? `${families.length} 个逻辑证据族交叉验证；现实估计与披露值相差 ${gapPercent}%。`
+          : `仅有 ${families.length} 个逻辑证据族，按政策不得输出高置信结论。`,
       actionSuggestions: rule.suggestions,
     };
   });

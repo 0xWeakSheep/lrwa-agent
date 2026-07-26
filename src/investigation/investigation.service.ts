@@ -23,6 +23,7 @@ import {
   deterministicId,
   deterministicTime,
   generateEvidence,
+  verifyEvidenceHash,
 } from './reality-twin';
 
 export interface DemoCaseBundle {
@@ -153,10 +154,10 @@ export class InvestigationService {
       investigationId,
       status: 'PROPOSED',
       methodology:
-        '用 1,024 个参数化探针对门店、消费者面板、渠道、用工和供应链进行五路独立验证。',
+        '以 1,024 个参数化探针的聚合配额，对门店、消费者面板、渠道、用工和供应链进行五路交叉验证。',
       tasks,
       totalProbes: 1024,
-      minimumIndependentFamilies: 2,
+      minimumEvidenceFamilies: 2,
       safetyBoundary:
         '本 Demo 仅运行完全虚构的 Reality Twin；不冒充真人、不联系真实企业、不抓取真实个人数据。',
     };
@@ -165,14 +166,14 @@ export class InvestigationService {
       systemPrompt:
         'You are the planning layer for a synthetic due-diligence demo. Return exactly one JSON object shaped as {"content":"short explanation","suggestions":["short action"]}. Use one to three suggestion strings, no extra keys and no markdown. Never alter supplied probe counts or numerical claims.',
       userPrompt:
-        'Explain why five independent evidence families and 1,024 probes are appropriate for validating the fictional Morrow claims: 48 stores, 118 daily orders per store, ¥19.6 average ticket, and ¥3.33m June GMV.',
+        'Explain why five logical evidence families and a 1,024-probe aggregate sampling quota are useful for cross-checking the fictional Morrow claims: 48 stores, 118 daily orders per store, ¥19.6 average ticket, and ¥3.33m June GMV. Do not claim statistical independence.',
       schema: insightSchema,
       fallback: {
         content:
-          '以门店、消费者、数字渠道、用工和供应链五个独立证据族交叉核验，可降低单一来源偏差。',
+          '以门店、消费者、数字渠道、用工和供应链五个逻辑证据族交叉核验，可降低对单一类别信号的依赖。',
         suggestions: [
           '保持 1,024 个参数化探针的固定分层配额。',
-          '任何高置信结论至少依赖两个独立证据族。',
+          '任何高置信结论至少依赖两个逻辑证据族。',
         ],
       },
     });
@@ -192,7 +193,7 @@ export class InvestigationService {
       {
         tasks: tasks.length,
         totalProbes: 1024,
-        minimumIndependentFamilies: 2,
+        minimumEvidenceFamilies: 2,
       },
     );
     return investigation;
@@ -250,13 +251,17 @@ export class InvestigationService {
       investigation.agents,
       investigation.hypothesis?.corporateOrderShare ?? 0,
     );
+    const hashesVerified = evidence.every(verifyEvidenceHash);
+    if (!hashesVerified) {
+      throw new ConflictException('Evidence hash verification failed');
+    }
     this.evidenceByInvestigation.set(investigation.id, evidence);
     for (const item of evidence) {
       this.recordEvent(
         investigation,
         'EVIDENCE_CAPTURED',
         item.agent.role,
-        `${item.source.family} 证据已写入不可变证据账本。`,
+        `${item.source.family} 聚合证据已写入可追溯记录。`,
         {
           evidenceId: item.id,
           evidenceHash: item.hash,
@@ -268,12 +273,13 @@ export class InvestigationService {
       investigation,
       'EVIDENCE_AUDITED',
       'EVIDENCE_AUDITOR',
-      '证据审计员已验证五个来源族的标记、哈希、Agent 与工具链路。',
+      '证据审计员已重新计算并验证五个逻辑证据族的标记、哈希、Agent 与工具链路。',
       {
         evidenceItems: evidence.length,
-        independentFamilies: new Set(evidence.map((item) => item.source.family))
-          .size,
-        hashesVerified: true,
+        logicalEvidenceFamilies: new Set(
+          evidence.map((item) => item.source.family),
+        ).size,
+        hashesVerified,
       },
     );
 
@@ -294,7 +300,7 @@ export class InvestigationService {
       investigation,
       'ESTIMATE_COMPUTED',
       'STATISTICIAN',
-      '统计分析师完成现实估计、置信区间与披露差距计算。',
+      '统计分析师完成现实估计、固定情景范围与披露差距计算。',
       {
         estimatedMonthlyGmv: monthlyGmvFinding?.estimatedValue ?? 0,
         lowerBound: monthlyGmvFinding?.lowerBound ?? 0,
@@ -311,7 +317,7 @@ export class InvestigationService {
         {
           findingId: finding.id,
           confidence: finding.confidence,
-          independentFamilies: finding.independentEvidenceFamilies.length,
+          evidenceFamilies: finding.evidenceFamilies.length,
         },
       );
     }
@@ -368,7 +374,7 @@ export class InvestigationService {
       operation: 'EXPLANATION',
       systemPrompt:
         'You explain deterministic findings in a synthetic due-diligence demo. Return exactly one JSON object shaped as {"content":"short explanation","suggestions":["short action"]}. Use one to three suggestion strings, no extra keys and no markdown. Do not recalculate, replace, or embellish numerical values.',
-      userPrompt: `Explain this immutable finding: reported GMV ¥3.33m, estimate ¥${monthlyFindingForExplanation?.estimatedValue ?? 0}, interval ¥${monthlyFindingForExplanation?.lowerBound ?? 0}–¥${monthlyFindingForExplanation?.upperBound ?? 0}, gap ${monthlyFindingForExplanation?.gapPercent ?? 0}%, confidence ${monthlyFindingForExplanation?.confidence ?? 0}, verdict ${monthlyFindingForExplanation?.verdict ?? 'INCONCLUSIVE'}.`,
+      userPrompt: `Explain this deterministic synthetic finding: reported GMV ¥3.33m, estimate ¥${monthlyFindingForExplanation?.estimatedValue ?? 0}, fixed scenario band ¥${monthlyFindingForExplanation?.lowerBound ?? 0}–¥${monthlyFindingForExplanation?.upperBound ?? 0}, gap ${monthlyFindingForExplanation?.gapPercent ?? 0}%, heuristic policy score ${monthlyFindingForExplanation?.confidence ?? 0}, verdict ${monthlyFindingForExplanation?.verdict ?? 'INCONCLUSIVE'}.`,
       schema: insightSchema,
       fallback: {
         content:

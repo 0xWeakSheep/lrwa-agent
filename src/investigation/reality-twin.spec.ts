@@ -4,6 +4,7 @@ import {
   createMorrowCase,
   generateEvidence,
   stableHash,
+  verifyEvidenceHash,
 } from './reality-twin';
 
 describe('seeded Morrow reality twin', () => {
@@ -127,6 +128,7 @@ describe('seeded Morrow reality twin', () => {
       expect(item.agent.role).toBeTruthy();
       expect(item.tool).toBeTruthy();
       expect(hash).toBe(stableHash(payload));
+      expect(verifyEvidenceHash(item)).toBe(true);
     }
 
     for (const finding of findings) {
@@ -135,10 +137,26 @@ describe('seeded Morrow reality twin', () => {
         expect(evidence.some((item) => item.id === evidenceId)).toBe(true);
       }
       if (finding.confidenceBand === 'HIGH') {
-        expect(
-          finding.independentEvidenceFamilies.length,
-        ).toBeGreaterThanOrEqual(2);
+        expect(finding.evidenceFamilies.length).toBeGreaterThanOrEqual(2);
       }
     }
+  });
+
+  it('rejects a receipt whose hashed payload was changed', () => {
+    const [evidence] = generateEvidence(
+      demoCase,
+      investigationId,
+      seed,
+      agents,
+    );
+    const tampered = {
+      ...evidence,
+      measurements: {
+        ...evidence.measurements,
+        estimatedMonthlyGmv: 9_999_999,
+      },
+    };
+
+    expect(verifyEvidenceHash(tampered)).toBe(false);
   });
 });

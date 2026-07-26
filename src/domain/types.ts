@@ -62,7 +62,7 @@ export interface Plan {
   llmInsight?: AgentInsight;
   tasks: PlanTask[];
   totalProbes: 1024;
-  minimumIndependentFamilies: 2;
+  minimumEvidenceFamilies: 2;
   safetyBoundary: string;
 }
 
@@ -130,7 +130,7 @@ export interface Finding {
   verdict: FindingVerdict;
   confidence: number;
   confidenceBand: 'LOW' | 'MEDIUM' | 'HIGH';
-  independentEvidenceFamilies: EvidenceFamily[];
+  evidenceFamilies: EvidenceFamily[];
   evidenceIds: string[];
   reportedValue: number;
   estimatedValue: number;
