@@ -11,6 +11,29 @@ import type {
   Investigation,
 } from './../src/domain/types';
 import type { DemoCaseBundle } from './../src/investigation/investigation.service';
+import {
+  DeepSeekService,
+  type DeepSeekJsonRequest,
+  type DeepSeekJsonResult,
+} from './../src/llm/deepseek.service';
+
+const deterministicDeepSeek = {
+  generateJson<T>(
+    input: DeepSeekJsonRequest<T>,
+  ): Promise<DeepSeekJsonResult<T>> {
+    return Promise.resolve({
+      value: input.fallback,
+      provenance: {
+        provider: 'deepseek',
+        model: 'deepseek-v4-flash',
+        mode: 'DETERMINISTIC_FALLBACK',
+        operation: input.operation,
+        attempts: 0,
+        reason: 'NO_API_KEY',
+      },
+    });
+  },
+};
 
 describe('LRWA demo API (e2e)', () => {
   let app: INestApplication<App>;
@@ -18,7 +41,10 @@ describe('LRWA demo API (e2e)', () => {
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(DeepSeekService)
+      .useValue(deterministicDeepSeek)
+      .compile();
 
     app = moduleFixture.createNestApplication();
     configureApp(app);
@@ -55,6 +81,13 @@ describe('LRWA demo API (e2e)', () => {
     expect(
       plannedBody.plan?.tasks.reduce((sum, task) => sum + task.sampleSize, 0),
     ).toBe(1024);
+    expect(plannedBody.plan?.llmInsight?.provenance).toMatchObject({
+      provider: 'deepseek',
+      model: 'deepseek-v4-flash',
+      mode: 'DETERMINISTIC_FALLBACK',
+      operation: 'PLAN',
+      reason: 'NO_API_KEY',
+    });
 
     const approved = await request(app.getHttpServer())
       .post(`/v1/investigations/${investigationId}/approve`)
@@ -68,6 +101,19 @@ describe('LRWA demo API (e2e)', () => {
     const startedBody = started.body as unknown as Investigation;
     expect(startedBody.status).toBe('COMPLETED');
     expect(startedBody.summary?.overallRisk).toBe('HIGH');
+    expect(startedBody.llmRuns?.map((run) => run.operation)).toEqual([
+      'PLAN',
+      'CHALLENGE',
+      'EXPLANATION',
+    ]);
+    expect(
+      startedBody.llmRuns?.every(
+        (run) =>
+          run.provider === 'deepseek' &&
+          run.model === 'deepseek-v4-flash' &&
+          run.mode === 'DETERMINISTIC_FALLBACK',
+      ),
+    ).toBe(true);
 
     const evidenceResponse = await request(app.getHttpServer())
       .get(`/v1/investigations/${investigationId}/evidence`)
@@ -109,6 +155,10 @@ describe('LRWA demo API (e2e)', () => {
       .expect(({ text }) => {
         expect(text).toContain('INVESTIGATION_COMPLETED');
         expect(text).toContain('HYPOTHESIS_RAISED');
+        expect(text).toContain('LLM_LAYER_USED');
+        expect(text).toContain('deepseek-v4-flash');
+        expect(text).not.toContain('authorization');
+        expect(text).not.toContain('Bearer ');
         expect(text).toContain('SKEPTIC');
         expect(text).toContain('SIMULATED');
       });

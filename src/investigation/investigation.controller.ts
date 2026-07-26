@@ -55,9 +55,9 @@ export class InvestigationController {
   }
 
   @Post('investigations/:investigationId/plan')
-  proposePlan(
+  async proposePlan(
     @Param('investigationId') investigationId: string,
-  ): Investigation {
+  ): Promise<Investigation> {
     return this.investigationService.proposePlan(investigationId);
   }
 
@@ -69,17 +69,17 @@ export class InvestigationController {
   }
 
   @Post('investigations/:investigationId/start')
-  startInvestigation(
+  async startInvestigation(
     @Param('investigationId') investigationId: string,
-  ): Investigation {
+  ): Promise<Investigation> {
     return this.investigationService.startInvestigation(investigationId);
   }
 
   @Post('investigations/:investigationId/replay')
-  replayInvestigation(
+  async replayInvestigation(
     @Param('investigationId') investigationId: string,
     @Body() body: unknown,
-  ): Investigation {
+  ): Promise<Investigation> {
     const parsed = replayRequestSchema.safeParse(body ?? {});
     if (!parsed.success) {
       throw new BadRequestException({

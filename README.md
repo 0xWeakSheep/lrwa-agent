@@ -22,6 +22,39 @@ npm run start:dev
 The default API is `http://localhost:3001/v1`; `PORT` can override it. No API
 key or external service is required.
 
+## DeepSeek language layer
+
+DeepSeek optionally powers three bounded language tasks:
+
+- `PLAN`: explains the fixed five-family, 1,024-probe investigation plan.
+- `CHALLENGE`: helps the Skeptic articulate the fixed 20% corporate-order
+  counter-hypothesis.
+- `EXPLANATION`: explains deterministic findings and next actions.
+
+It never generates evidence, measurements, hashes, intervals, confidence,
+verdicts or replay parameters. Those remain in the seeded deterministic
+pipeline. If `DEEPSEEK_API_KEY` is absent, times out, returns invalid JSON, is
+rate-limited or has an upstream failure, the same API flow completes with
+deterministic local language. HTTP 429 and 5xx responses receive one short
+retry.
+
+The demo requests non-thinking JSON mode with a 512-token ceiling so the live
+language layer stays fast and bounded.
+
+Configuration:
+
+```dotenv
+DEEPSEEK_API_KEY=
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-v4-flash
+```
+
+The key is read only from the process environment. It is never included in
+responses, events, prompts, logs or repository files. Provenance exposes only
+provider, model, operation, attempts and `LIVE` or `DETERMINISTIC_FALLBACK`
+mode. The default is `deepseek-v4-flash`; the deprecated legacy
+`deepseek-chat` name is not used.
+
 ## Canonical Morrow story
 
 Management reports 48 operating stores, 118 daily orders per store, an average
@@ -112,6 +145,9 @@ and unknown entities return `404`.
   and replay identity.
 - The replay request is validated, recorded on the investigation, and emitted
   in auditable SSE events.
+- `investigation.llmRuns`, `agentInsights.*.provenance` and
+  `LLM_LAYER_USED` events identify the language provider, model and mode without
+  exposing prompts or secrets.
 
 ## Verify
 
@@ -125,7 +161,8 @@ npm run build
 
 Tests cover the canonical values, 48 map stores, exactly 1,024 probes, seeded
 reproducibility, evidence hash traceability, the confidence gate, REST state
-transitions, SSE, hypothesis validation and changed replay results.
+transitions, SSE, hypothesis validation, changed replay results, no-key
+fallback, live JSON parsing, provenance and retry behavior.
 
 ## Container deployment
 

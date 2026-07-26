@@ -59,6 +59,7 @@ export interface Plan {
   investigationId: string;
   status: 'PROPOSED' | 'APPROVED';
   methodology: string;
+  llmInsight?: AgentInsight;
   tasks: PlanTask[];
   totalProbes: 1024;
   minimumIndependentFamilies: 2;
@@ -153,7 +154,32 @@ export type EventType =
   | 'INVESTIGATION_COMPLETED'
   | 'REPLAY_CREATED'
   | 'HYPOTHESIS_RAISED'
-  | 'REPLAY_STARTED';
+  | 'REPLAY_STARTED'
+  | 'LLM_LAYER_USED';
+
+export type LlmOperation = 'PLAN' | 'CHALLENGE' | 'EXPLANATION';
+
+export interface LlmProvenance {
+  provider: 'deepseek';
+  model: string;
+  mode: 'LIVE' | 'DETERMINISTIC_FALLBACK';
+  operation: LlmOperation;
+  attempts: number;
+  reason?:
+    | 'NO_API_KEY'
+    | 'TIMEOUT'
+    | 'RATE_LIMIT'
+    | 'UPSTREAM_ERROR'
+    | 'INVALID_RESPONSE'
+    | 'NETWORK_ERROR';
+}
+
+export interface AgentInsight {
+  operation: LlmOperation;
+  content: string;
+  suggestions: string[];
+  provenance: LlmProvenance;
+}
 
 export interface InvestigationEvent {
   id: string;
@@ -192,6 +218,8 @@ export interface Investigation {
     submittedAt: string;
     disclosure: SimulationLabel;
   };
+  llmRuns?: LlmProvenance[];
+  agentInsights?: Partial<Record<LlmOperation, AgentInsight>>;
   summary?: {
     claimsChecked: number;
     evidenceItems: number;

@@ -3,7 +3,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { z } from 'zod';
 import type {
+  AgentInsight,
   DemoCase,
   Evidence,
   Finding,
@@ -13,6 +15,7 @@ import type {
   Plan,
   PlanTask,
 } from '../domain/types';
+import { DeepSeekService } from '../llm/deepseek.service';
 import {
   computeFindings,
   createAgentTeam,
@@ -27,6 +30,13 @@ export interface DemoCaseBundle {
   investigation: Investigation;
 }
 
+const insightSchema = z
+  .object({
+    content: z.string().trim().min(1).max(800),
+    suggestions: z.array(z.string().trim().min(1).max(240)).max(4),
+  })
+  .strict();
+
 @Injectable()
 export class InvestigationService {
   private readonly cases = new Map<string, DemoCase>();
@@ -37,6 +47,8 @@ export class InvestigationService {
     string,
     InvestigationEvent[]
   >();
+
+  constructor(private readonly deepSeekService: DeepSeekService) {}
 
   createDemoCase(seed = 'morrow-demo-2026'): DemoCaseBundle {
     const demoCase = createMorrowCase(seed);
@@ -65,6 +77,8 @@ export class InvestigationService {
       disclosure: 'SIMULATED',
       supervisor,
       agents: agents.filter((agent) => agent.role !== 'SUPERVISOR'),
+      llmRuns: [],
+      agentInsights: {},
     };
     this.cases.set(demoCase.id, demoCase);
     this.investigations.set(investigation.id, investigation);
@@ -89,7 +103,7 @@ export class InvestigationService {
     return this.requireInvestigation(investigationId);
   }
 
-  proposePlan(investigationId: string): Investigation {
+  async proposePlan(investigationId: string): Promise<Investigation> {
     const investigation = this.requireInvestigation(investigationId);
     this.assertStatus(investigation, 'DRAFT');
     const tasks: PlanTask[] = [
@@ -146,6 +160,28 @@ export class InvestigationService {
       safetyBoundary:
         '本 Demo 仅运行完全虚构的 Reality Twin；不冒充真人、不联系真实企业、不抓取真实个人数据。',
     };
+    const planning = await this.deepSeekService.generateJson({
+      operation: 'PLAN',
+      systemPrompt:
+        'You are the planning layer for a synthetic due-diligence demo. Return exactly one JSON object shaped as {"content":"short explanation","suggestions":["short action"]}. Use one to three suggestion strings, no extra keys and no markdown. Never alter supplied probe counts or numerical claims.',
+      userPrompt:
+        'Explain why five independent evidence families and 1,024 probes are appropriate for validating the fictional Morrow claims: 48 stores, 118 daily orders per store, ¥19.6 average ticket, and ¥3.33m June GMV.',
+      schema: insightSchema,
+      fallback: {
+        content:
+          '以门店、消费者、数字渠道、用工和供应链五个独立证据族交叉核验，可降低单一来源偏差。',
+        suggestions: [
+          '保持 1,024 个参数化探针的固定分层配额。',
+          '任何高置信结论至少依赖两个独立证据族。',
+        ],
+      },
+    });
+    plan.llmInsight = this.recordLlmUsage(
+      investigation,
+      planning.value,
+      planning.provenance,
+      'SUPERVISOR',
+    );
     investigation.plan = plan;
     investigation.status = 'PLANNED';
     this.recordEvent(
@@ -180,7 +216,7 @@ export class InvestigationService {
     return investigation;
   }
 
-  startInvestigation(investigationId: string): Investigation {
+  async startInvestigation(investigationId: string): Promise<Investigation> {
     const investigation = this.requireInvestigation(investigationId);
     this.assertStatus(investigation, 'APPROVED');
     const demoCase = this.requireCase(investigation.caseId);
@@ -280,6 +316,28 @@ export class InvestigationService {
       );
     }
     if (investigation.replayOf === undefined) {
+      const challenge = await this.deepSeekService.generateJson({
+        operation: 'CHALLENGE',
+        systemPrompt:
+          'You are the skeptic in a synthetic investment due-diligence demo. Return exactly one JSON object shaped as {"content":"short challenge","suggestions":["short action"]}. Use one to three suggestion strings, no extra keys and no markdown. Challenge the conclusion without changing any computed values.',
+        userPrompt:
+          'The deterministic pipeline estimates fictional Morrow June GMV at ¥1.92m versus ¥3.33m reported, with a ¥1.72m–¥2.14m interval, 42.3% gap, and 0.88 confidence. Frame the pre-approved counter-hypothesis that 20% of orders may be unobserved corporate orders. It must require human approval before replay.',
+        schema: insightSchema,
+        fallback: {
+          content:
+            '公开触点可能遗漏企业团购订单；建议用 20% 隐含占比检验这一替代解释。',
+          suggestions: [
+            '在人工批准后以相同 seed 重放。',
+            '记录假设参数并比较 GMV 区间、差距和置信度。',
+          ],
+        },
+      });
+      this.recordLlmUsage(
+        investigation,
+        challenge.value,
+        challenge.provenance,
+        'SKEPTIC',
+      );
       investigation.proposedHypotheses = [
         {
           type: 'CORPORATE_ORDER_SHARE',
@@ -303,6 +361,28 @@ export class InvestigationService {
         },
       );
     }
+    const monthlyFindingForExplanation = findings.find(
+      (finding) => finding.reportedValue === 3_330_000,
+    );
+    const explanation = await this.deepSeekService.generateJson({
+      operation: 'EXPLANATION',
+      systemPrompt:
+        'You explain deterministic findings in a synthetic due-diligence demo. Return exactly one JSON object shaped as {"content":"short explanation","suggestions":["short action"]}. Use one to three suggestion strings, no extra keys and no markdown. Do not recalculate, replace, or embellish numerical values.',
+      userPrompt: `Explain this immutable finding: reported GMV ¥3.33m, estimate ¥${monthlyFindingForExplanation?.estimatedValue ?? 0}, interval ¥${monthlyFindingForExplanation?.lowerBound ?? 0}–¥${monthlyFindingForExplanation?.upperBound ?? 0}, gap ${monthlyFindingForExplanation?.gapPercent ?? 0}%, confidence ${monthlyFindingForExplanation?.confidence ?? 0}, verdict ${monthlyFindingForExplanation?.verdict ?? 'INCONCLUSIVE'}.`,
+      schema: insightSchema,
+      fallback: {
+        content:
+          '多源现实信号支持的 GMV 估计显著低于披露值，因此当前披露不获支持；该判断不等同于对真实企业的结论。',
+        suggestions:
+          monthlyFindingForExplanation?.actionSuggestions.slice(0, 3) ?? [],
+      },
+    });
+    this.recordLlmUsage(
+      investigation,
+      explanation.value,
+      explanation.provenance,
+      'STATISTICIAN',
+    );
 
     investigation.status = 'COMPLETED';
     investigation.completedAt = deterministicTime(investigation.seed, 40);
@@ -334,10 +414,10 @@ export class InvestigationService {
     return investigation;
   }
 
-  replayInvestigation(
+  async replayInvestigation(
     investigationId: string,
     corporateOrderShare: number,
-  ): Investigation {
+  ): Promise<Investigation> {
     const original = this.requireInvestigation(investigationId);
     this.assertStatus(original, 'COMPLETED');
     const replaySeed = original.seed;
@@ -373,6 +453,8 @@ export class InvestigationService {
               : hypothesis.status,
         }),
       ),
+      llmRuns: [...(original.llmRuns ?? [])],
+      agentInsights: { ...(original.agentInsights ?? {}) },
       plan: original.plan
         ? {
             ...original.plan,
@@ -504,5 +586,39 @@ export class InvestigationService {
       data,
     });
     this.eventsByInvestigation.set(investigation.id, events);
+  }
+
+  private recordLlmUsage(
+    investigation: Investigation,
+    value: z.infer<typeof insightSchema>,
+    provenance: AgentInsight['provenance'],
+    agentRole: InvestigationEvent['agentRole'],
+  ): AgentInsight {
+    const insight: AgentInsight = {
+      operation: provenance.operation,
+      content: value.content,
+      suggestions: value.suggestions,
+      provenance,
+    };
+    investigation.llmRuns = [...(investigation.llmRuns ?? []), provenance];
+    investigation.agentInsights = {
+      ...(investigation.agentInsights ?? {}),
+      [provenance.operation]: insight,
+    };
+    this.recordEvent(
+      investigation,
+      'LLM_LAYER_USED',
+      agentRole,
+      `${provenance.operation} 文字推理层已完成；数值管线保持确定性。`,
+      {
+        provider: provenance.provider,
+        model: provenance.model,
+        mode: provenance.mode,
+        operation: provenance.operation,
+        attempts: provenance.attempts,
+        reason: provenance.reason ?? '',
+      },
+    );
+    return insight;
   }
 }
