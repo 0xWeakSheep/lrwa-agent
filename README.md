@@ -16,9 +16,9 @@ findings and a caller-gated counterfactual replay.
 - Public product demo:
   https://lrwa-agent-web.cheeky-angel-7701.chatgpt.site
 - 90-second demo film:
-  https://raw.githubusercontent.com/0xWeakSheep/lrwa-agent-web/main/public/materials/LRWA_OpenArena_Demo_90s.mp4
+  https://cdn.jsdelivr.net/gh/0xWeakSheep/lrwa-agent-web@11a13d001444f047ff3582870b2f3f6adb6f6c60/public/materials/LRWA_OpenArena_Demo_90s_web.mp4
 - Public pitch deck:
-  https://raw.githubusercontent.com/0xWeakSheep/lrwa-agent-web/main/public/materials/LRWA_Seed_Deck.pdf
+  https://cdn.jsdelivr.net/gh/0xWeakSheep/lrwa-agent-web@11a13d001444f047ff3582870b2f3f6adb6f6c60/public/materials/LRWA_Seed_Deck.pdf
 - Next.js frontend:
   https://github.com/0xWeakSheep/lrwa-agent-web
 
