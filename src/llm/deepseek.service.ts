@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
-import type { LlmOperation, LlmProvenance } from '../domain/types';
+import type { LlmOperation, LlmProvenance } from './deepseek.types';
 
 export const DEEPSEEK_FETCH = 'DEEPSEEK_FETCH';
 
@@ -66,6 +66,8 @@ function fallbackResult<T>(
 
 @Injectable()
 export class DeepSeekService {
+  private liveHttpRequests = 0;
+
   constructor(
     private readonly configService: ConfigService,
     @Inject(DEEPSEEK_FETCH) private readonly fetcher: FetchLike,
@@ -86,6 +88,34 @@ export class DeepSeekService {
         'NO_API_KEY',
       );
     }
+    if (this.configService.get<string>('ENABLE_LIVE_LLM') !== 'true') {
+      return fallbackResult(
+        request.fallback,
+        model,
+        request.operation,
+        0,
+        'LIVE_DISABLED',
+      );
+    }
+    const configuredBudget = Number.parseInt(
+      this.configService.get<string>(
+        'MAX_LIVE_LLM_HTTP_REQUESTS_PER_PROCESS',
+      ) ?? '',
+      10,
+    );
+    const liveHttpRequestBudget =
+      Number.isFinite(configuredBudget) && configuredBudget > 0
+        ? configuredBudget
+        : 8;
+    if (this.liveHttpRequests >= liveHttpRequestBudget) {
+      return fallbackResult(
+        request.fallback,
+        model,
+        request.operation,
+        0,
+        'BUDGET_EXHAUSTED',
+      );
+    }
     const baseUrl =
       this.configService.get<string>('DEEPSEEK_BASE_URL') ??
       'https://api.deepseek.com';
@@ -93,6 +123,16 @@ export class DeepSeekService {
     let lastReason: NonNullable<LlmProvenance['reason']> = 'UPSTREAM_ERROR';
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      if (this.liveHttpRequests >= liveHttpRequestBudget) {
+        return fallbackResult(
+          request.fallback,
+          model,
+          request.operation,
+          attempt - 1,
+          'BUDGET_EXHAUSTED',
+        );
+      }
+      this.liveHttpRequests += 1;
       const abortController = new AbortController();
       const timeout = setTimeout(() => abortController.abort(), timeoutMs);
       try {
@@ -135,7 +175,19 @@ export class DeepSeekService {
           );
         }
 
-        const envelope = apiResponseSchema.safeParse(await response.json());
+        let responseBody: unknown;
+        try {
+          responseBody = await response.json();
+        } catch {
+          return fallbackResult(
+            request.fallback,
+            model,
+            request.operation,
+            attempt,
+            'INVALID_RESPONSE',
+          );
+        }
+        const envelope = apiResponseSchema.safeParse(responseBody);
         if (!envelope.success) {
           return fallbackResult(
             request.fallback,

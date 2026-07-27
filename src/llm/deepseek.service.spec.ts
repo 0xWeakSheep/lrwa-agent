@@ -18,7 +18,7 @@ type TestValue = z.infer<typeof responseSchema>;
 const request: DeepSeekJsonRequest<TestValue> = {
   operation: 'PLAN',
   systemPrompt: 'Return JSON.',
-  userPrompt: 'Explain a synthetic plan.',
+  userPrompt: 'Draft a bounded evidence plan.',
   schema: responseSchema,
   fallback: {
     content: 'deterministic',
@@ -52,7 +52,7 @@ function successResponse(value: TestValue): Response {
 
 describe('DeepSeekService', () => {
   it('uses an immediate deterministic fallback when no API key exists', async () => {
-    const fetcher = jest.fn<FetchLike>();
+    const fetcher = jest.fn<Promise<Response>, Parameters<FetchLike>>();
     const service = new DeepSeekService(config({}), fetcher);
 
     const result = await service.generateJson(request);
@@ -72,7 +72,7 @@ describe('DeepSeekService', () => {
   it('calls the configured OpenAI-compatible endpoint and returns JSON', async () => {
     let capturedInput: string | URL | undefined;
     let capturedInit: RequestInit | undefined;
-    const fetcher = jest.fn<FetchLike>(
+    const fetcher = jest.fn<Promise<Response>, Parameters<FetchLike>>(
       (input: string | URL, init?: RequestInit) => {
         capturedInput = input;
         capturedInit = init;
@@ -86,6 +86,7 @@ describe('DeepSeekService', () => {
         DEEPSEEK_API_KEY: 'test-secret-never-exposed',
         DEEPSEEK_BASE_URL: 'https://deepseek.example/',
         DEEPSEEK_MODEL: 'deepseek-v4-flash',
+        ENABLE_LIVE_LLM: 'true',
       }),
       fetcher,
     );
@@ -119,15 +120,59 @@ describe('DeepSeekService', () => {
     });
   });
 
+  it('keeps live model calls disabled unless the process explicitly enables them', async () => {
+    const fetcher = jest.fn<Promise<Response>, Parameters<FetchLike>>();
+    const service = new DeepSeekService(
+      config({ DEEPSEEK_API_KEY: 'configured-but-disabled' }),
+      fetcher,
+    );
+
+    const result = await service.generateJson(request);
+
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(result.provenance).toMatchObject({
+      mode: 'DETERMINISTIC_FALLBACK',
+      attempts: 0,
+      reason: 'LIVE_DISABLED',
+    });
+  });
+
+  it('caps live requests per process before making another paid call', async () => {
+    const fetcher = jest
+      .fn<Promise<Response>, Parameters<FetchLike>>()
+      .mockResolvedValue(successResponse({ content: 'live', suggestions: [] }));
+    const service = new DeepSeekService(
+      config({
+        DEEPSEEK_API_KEY: 'test-key',
+        ENABLE_LIVE_LLM: 'true',
+        MAX_LIVE_LLM_HTTP_REQUESTS_PER_PROCESS: '1',
+      }),
+      fetcher,
+    );
+
+    await service.generateJson(request);
+    const capped = await service.generateJson(request);
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(capped.provenance).toMatchObject({
+      mode: 'DETERMINISTIC_FALLBACK',
+      attempts: 0,
+      reason: 'BUDGET_EXHAUSTED',
+    });
+  });
+
   it('retries 429 once and then succeeds', async () => {
     const fetcher = jest
-      .fn<FetchLike>()
+      .fn<Promise<Response>, Parameters<FetchLike>>()
       .mockResolvedValueOnce(new Response('', { status: 429 }))
       .mockResolvedValueOnce(
         successResponse({ content: 'retry worked', suggestions: [] }),
       );
     const service = new DeepSeekService(
-      config({ DEEPSEEK_API_KEY: 'test-key' }),
+      config({
+        DEEPSEEK_API_KEY: 'test-key',
+        ENABLE_LIVE_LLM: 'true',
+      }),
       fetcher,
     );
 
@@ -142,10 +187,13 @@ describe('DeepSeekService', () => {
 
   it('falls back without leaking upstream failures', async () => {
     const fetcher = jest
-      .fn<FetchLike>()
+      .fn<Promise<Response>, Parameters<FetchLike>>()
       .mockResolvedValue(new Response('', { status: 503 }));
     const service = new DeepSeekService(
-      config({ DEEPSEEK_API_KEY: 'test-key' }),
+      config({
+        DEEPSEEK_API_KEY: 'test-key',
+        ENABLE_LIVE_LLM: 'true',
+      }),
       fetcher,
     );
 
@@ -157,6 +205,27 @@ describe('DeepSeekService', () => {
       mode: 'DETERMINISTIC_FALLBACK',
       attempts: 2,
       reason: 'UPSTREAM_ERROR',
+    });
+  });
+
+  it('classifies a non-JSON success body as an invalid response', async () => {
+    const fetcher = jest
+      .fn<Promise<Response>, Parameters<FetchLike>>()
+      .mockResolvedValue(new Response('not-json', { status: 200 }));
+    const service = new DeepSeekService(
+      config({
+        DEEPSEEK_API_KEY: 'test-key',
+        ENABLE_LIVE_LLM: 'true',
+      }),
+      fetcher,
+    );
+
+    const result = await service.generateJson(request);
+
+    expect(result.provenance).toMatchObject({
+      mode: 'DETERMINISTIC_FALLBACK',
+      attempts: 1,
+      reason: 'INVALID_RESPONSE',
     });
   });
 });
