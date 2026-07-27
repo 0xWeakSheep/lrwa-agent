@@ -6,13 +6,13 @@ export class AppController {
   getHealth(): {
     service: string;
     status: 'ok';
-    mode: 'SIMULATED';
+    mode: 'EVIDENCE_OPERATIONS_PROTOTYPE';
     apiVersion: 'v1';
   } {
     return {
       service: 'LRWA — Live Real-World Assurance / 现实验证引擎',
       status: 'ok',
-      mode: 'SIMULATED',
+      mode: 'EVIDENCE_OPERATIONS_PROTOTYPE',
       apiVersion: 'v1',
     };
   }

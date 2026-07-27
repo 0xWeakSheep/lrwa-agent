@@ -1,244 +1,198 @@
-# LRWA Demo Methodology
+# LRWA Evidence-Operations Methodology
 
-This note describes what the BUIDL_QUESTS 2026 demo actually computes. It is
-intentionally explicit about the difference between a reproducible product
-demonstration and a calibrated production diligence system.
+This note describes the behavior implemented in the current prototype. It does
+not describe a completed investigation, a calibrated financial model, or a
+production compliance system.
 
-## Scope and safety boundary
+## Core rule
 
-The Morrow Coffee case is fictional. Every source and artifact is labeled
-`SIMULATED`. The demo does not contact merchants, impersonate people, place
-orders, scrape live platforms, or process personal data.
+> A plan is not an action. An action is not a receipt. A receipt is not a
+> conclusion.
 
-Future production missions are limited to public, licensed,
-customer-authorized, or opt-in sources. Automated communication must disclose
-that it is automated. Sensitive collection and every counterfactual replay
-would require verified human approval in production. This demo has only an
-unauthenticated API/UI interaction gate; it is not an identity-verified or
-compliance-grade approval system.
+LRWA preserves those distinctions in both the API and the interface.
 
-## Verification loop
+## Workflow
 
 ```mermaid
 flowchart LR
-  A["Management claim"] --> B["Claim compiler"]
-  B --> C["Bounded mission plan"]
-  C --> D["Caller interaction gate"]
-  D --> E["Five evidence families"]
-  E --> F["Evidence verification"]
-  F --> G["Deterministic estimate"]
-  G --> H["Skeptic hypothesis"]
-  H --> I["Caller replay gate"]
-  I --> J["Deterministic replay"]
-  J --> K["Evidence requests"]
+  A["Material claim"] --> B["Four role plans"]
+  B --> C["Prepared"]
+  C --> D["User-confirmed authorized contact"]
+  D --> E["User-submitted receipt"]
+  E --> F["Server content hash"]
+  F --> G["Human review"]
+  G --> H["Next evidence request or conclusion"]
 ```
 
-The canonical plan contains exactly five tasks and a declared aggregate quota
-of 1,024 parameterized probes:
+The four role routes are:
 
-| Evidence category | Planned quota | Observable proxy |
-|---|---:|---|
-| Store observation | 320 | Operating state, availability, price, and store coverage |
-| Synthetic consumer panel | 256 | Pre-order journey, price, and throughput proxy |
-| Digital footprint | 192 | Time-series consistency of listing and fulfillment state |
-| Labor signal | 128 | Aggregate staffing capacity |
-| Supply chain | 128 | Aggregate replenishment capacity |
+- buyer: tests the practical purchase, availability, delivery, and after-sales
+  path;
+- supplier: tests capacity, replenishment, coverage, and operating constraints
+  through a real business identity where required;
+- peer or competitor: applies one visible comparison method to target and
+  comparable businesses;
+- skeptic: turns alternative explanations into new evidence requests.
 
-The current implementation produces one aggregate evidence receipt per family:
-five `Evidence` objects in total. The 1,024 probes are aggregate plan quotas
-represented by those receipts; the demo does not claim to execute or persist
-1,024 independent Agent conversations or raw observations.
+Role labels, perspectives, and safety boundaries are fixed by the server.
 
-Each task is executed separately through the synthetic Agent Executor. Before
-an adapter can run, the executor resolves the assigned specialist, checks the
-task tool against that role's allowlist, requires a non-empty declared
-guardrail manifest, and restricts execution to a `SIMULATED` case and matching
-deterministic adapter. The adapter must return the declared logical category,
-agent, tool and sample allocation with a valid content hash. The event ledger
-records the dispatch, policy check, declared guardrail count, receipt and
-completion for all five tasks. This proves task-level orchestration,
-tool-allowlist checks and a synthetic adapter boundary; it does not prove that
-free-text guardrails were independently enforced or that real-world
-observation occurred.
+## State transitions
 
-“Evidence family” means a logical category and calculation entry point. All
-five families share one synthetic fixture. Their statistical independence,
-source independence, and uncorrelated error have not been established.
+Each mission starts as `planned`.
 
-## Evidence receipts and provenance
+1. `planned → prepared`
+   - requires `userConfirmedCopy: true`;
+   - means the user prepared or copied the strategy;
+   - does not mean an external message was sent.
+2. `prepared → contacted`
+   - requires `userConfirmedExternalSend: true`;
+   - requires the user to name the actual authorized channel;
+   - records the user's attestation that a real, authorized channel was used;
+   - the current server does not send the message or verify provider delivery.
+3. `contacted → evidence_received`
+   - requires a user-confirmed receipt payload;
+   - the server stores the payload and its content hash;
+   - the current server does not verify the source provider.
 
-Each receipt records:
+`simulation_lab` investigations cannot record real contact or write into the
+real receipt ledger.
 
-- linked claims;
-- source label, family, name, and methodology;
-- responsible agent and tool;
-- sample size and deterministic collection time;
-- aggregate measurements;
-- a SHA-256 hash of the exact `JSON.stringify` payload produced by this code
-  version.
+## Receipt record
 
-At runtime the Evidence Auditor recomputes each
-`SHA-256(JSON.stringify(payload))` value before findings are calculated. These
-hashes establish content identity relative to the payload supplied to the
-verifier. They are not a digital signature, external timestamp, Merkle
-commitment, immutable ledger, proof of physical observation, or substitute for
-source authorization. A writer could alter both a payload and its hash. Storage
-uses in-memory maps and is lost on process restart; a production evidence
-ledger would require durable append-only storage, access controls, retention
-policy, signed source receipts, and external anchoring where appropriate.
+The current receipt payload contains:
 
-## Estimate calculation
+- role identifier;
+- user-entered source label;
+- optional source URL;
+- captured text;
+- stance: `supports`, `contradicts`, or `context`;
+- capture timestamp supplied by the user;
+- server recording timestamp;
+- authorization label `user_confirmed`;
+- SHA-256 content hash.
 
-For each claim, LRWA selects receipts that:
+The hash input is the JSON serialization of:
 
-1. link to the claim;
-2. belong to an allowed evidence family for that metric; and
-3. contain the required numeric measurement.
-
-The displayed point estimate is the arithmetic mean of the relevant
-family-level estimates. In the canonical GMV case, the five family estimates
-are:
-
-```text
-¥1.86m, ¥1.94m, ¥1.91m, ¥1.93m, ¥1.96m
+```json
+{
+  "roleId": "...",
+  "sourceLabel": "...",
+  "sourceUrl": "...",
+  "capturedText": "...",
+  "stance": "...",
+  "capturedAt": "..."
+}
 ```
 
-Their mean is ¥1.92m. The reported claim is ¥3.33m, so the displayed absolute
-gap is:
+The stored value is `sha256:` followed by the lowercase hexadecimal digest.
 
-```text
-abs(1.92 - 3.33) / 3.33 = 42.3%
-```
+The hash establishes content identity relative to this exact serialization. It
+does not establish authenticity, authorship, delivery, capture time, legal
+admissibility, or physical observation. A future provider webhook or licensed
+connector would need its own verification metadata.
 
-The base interval of ¥1.72m to ¥2.14m is a fixed scenario band for the
-synthetic benchmark. It is not presented as an empirically calibrated
-frequentist confidence interval.
+An exact retry of a receipt ID is idempotent. Reusing that ID with different
+content is rejected instead of silently preserving or replacing either
+version.
 
-## Policy confidence and verdict
-
-The API field named `confidence` is a transparent heuristic policy score, not
-the probability that a company committed fraud and not a statistically
-calibrated posterior.
-
-When at least two allowed evidence families are present:
-
-```text
-confidence = min(0.92, 0.78 + 0.02 × family_count) - hypothesis_penalty
-```
-
-With fewer than two families, the score is fixed at 0.59 and the result cannot
-enter the `HIGH` policy band.
-
-With five logical families and no replay penalty, the heuristic score is 0.88.
-A result is `HIGH` only when at least two logical families are present and the
-score is at least 0.80. The current code has not calibrated 0.88 against
-real-world outcomes.
-
-For `HIGH` confidence:
-
-- gap at or below 8% becomes `SUPPORTED`;
-- gap at or above 15% becomes `UNSUPPORTED`;
-- the middle band remains `INCONCLUSIVE`.
-
-Any result below `HIGH` confidence is `INCONCLUSIVE`, regardless of the point
-estimate. `UNSUPPORTED` means that the current sample does not support the
-claim. It is not a fraud finding, statutory audit opinion, legal conclusion, or
-investment recommendation.
-
-## Skeptic replay
-
-The Skeptic presents a preconfigured parameterized counterfactual in which an
-unobserved corporate-order channel could account for 20% of demand. The 20%
-share is not discovered from new evidence. The language model cannot change
-evidence or rerun the case autonomously. The replay endpoint validates the
-share between 0 and 0.5 and requires a separate caller interaction.
-
-For a share `s`, the synthetic GMV receipts are multiplied by:
-
-```text
-1 / (1 - s)
-```
-
-The scenario interval is widened by `s × 0.08`, and GMV confidence receives a
-penalty of `s × 0.30`.
-
-At `s = 0.20`, the result is:
-
-- estimate: ¥2.40m;
-- exact scenario band: ¥2.1156m to ¥2.7178m;
-- displayed band: ¥2.12m to ¥2.72m;
-- gap: 27.9%;
-- confidence: 0.82;
-- verdict: `UNSUPPORTED`.
-
-The replay uses the same seed and leaves the original evidence receipts
-unchanged. Core numeric outputs are repeatable for the same code version, seed,
-and hypothesis. The service is in-memory, and LIVE language-model text is not
-guaranteed to be identical across runs.
+Investigation creation also requires a client-generated UUID idempotency key.
+An exact retry returns the same investigation; reusing the key for different
+input is rejected. This prevents a lost response from causing a second model
+operation or duplicate draft.
 
 ## DeepSeek boundary
 
-DeepSeek is an optional bounded language layer for three operations:
+DeepSeek is optional per investigation. When the user opts in, the backend may
+request strict JSON containing, for each selected role:
 
-- `PLAN`: explain the already-fixed mission plan;
-- `CHALLENGE`: phrase the already-fixed 20% counter-hypothesis;
-- `EXPLANATION`: explain deterministic findings and next actions.
+- objective;
+- opening question;
+- follow-up;
+- requested receipt.
 
-The model does not generate evidence, measurements, hashes, fixed scenario
-bands, heuristic policy scores, verdicts, or replay parameters. Responses must
-be strict JSON and pass Zod validation. Requests use a 4.5-second timeout, one
-short retry for network, 429, or 5xx failures, and a deterministic fallback.
-Provenance exposes provider, model, operation, attempts, and `LIVE` or
-`DETERMINISTIC_FALLBACK`; application responses and events never expose the API
-key, authorization header, or prompts. Prompts are still transmitted to
-DeepSeek in LIVE mode. The application does not persist them beyond in-memory
-runtime state, but it cannot make retention promises on behalf of the model
-provider or hosting platform.
+The response is validated against a strict schema, the exact requested role
+set, and deterministic known-pattern checks. A role mismatch or text that
+matches the identity, deception, fabricated-action, metric, or conclusion
+patterns is discarded and the response provenance becomes
+`DETERMINISTIC_FALLBACK`. Pattern matching is not a complete semantic safety
+classifier, so every accepted draft still requires human review. Regardless of
+draft text, the model has no state-changing authority: it cannot:
 
-## Reproducibility checks
+- change server-owned role identity or safety boundaries;
+- mark a mission prepared or contacted;
+- create a receipt;
+- generate an operating metric, financial estimate, score, or conclusion;
+- claim that a real person, business, store, source, or platform was contacted;
+- recommend fake identities, deceptive accounts, access-control bypass, or
+  undisclosed automation.
 
-The test suite verifies:
+Planning provenance is returned as:
 
-- 48 fictional stores and a declared aggregate quota of 1,024;
-- canonical base and replay values;
-- identical core numeric results for the same code version, seed, and
-  hypothesis;
-- content-hash reconstruction for every evidence receipt;
-- the two-family minimum for high-confidence findings;
-- REST state transitions and validation;
-- task-level agent dispatch, tool-policy checks and blocked unauthorized tools;
-- ordered server-sent events;
-- no-key DeepSeek fallback, strict JSON parsing, provenance, and retry behavior.
+- `LIVE`: valid JSON came from the configured model;
+- `DETERMINISTIC_FALLBACK`: a model call was requested but no valid result was
+  available;
+- `NOT_REQUESTED`: model processing remained off.
 
-These checks prove consistency with the synthetic fixture. They do not prove
-real-world measurement validity, source independence, statistical calibration,
-fraud, regulatory compliance, or investment suitability.
+No API key is stored in the repository or returned to the client.
 
-Run:
+## Connector boundary
 
-```bash
-npm run format:check
-npm run lint
-npm test -- --runInBand
-npm run test:e2e -- --runInBand
-npm run build
-```
+Current capability reporting is explicit:
 
-## Production calibration path
+| Connector | Current state |
+|---|---|
+| Manual authorized channel | Available as a user action |
+| Meituan partner integration | Not configured |
+| Google Places integration | Not configured |
 
-The production moat is not the demo's fixed coefficients. It is the governed
-system for learning and versioning:
+The prototype never substitutes generated connector data when a connector is
+absent.
 
-- claim-to-observable mappings;
-- spatial and temporal sampling plans;
-- source authorization and reliability;
-- shared-source dependency detection;
-- benchmark-based interval calibration;
-- contradiction-driven replanning;
-- mission cost versus expected information gain;
-- longitudinal outcome feedback.
+## Storage and security limitations
 
-Before real investment use, LRWA would need authorized data connectors,
-documented sampling assumptions, benchmark datasets, calibration and drift
-tests, durable provenance, security review, and domain-specific human
-oversight.
+The current server uses a process-local in-memory map:
+
+- data disappears when the process restarts;
+- stale investigations are pruned by a configurable prototype TTL;
+- process-level investigation and per-investigation receipt limits bound memory
+  growth but do not replace authentication or rate limiting;
+- there is no authentication or tenant isolation;
+- there is no encrypted durable database;
+- there is no immutable event log;
+- there is no provider delivery webhook;
+- there is no compliance-grade approval or audit signature.
+
+The capability endpoint and frontend disclose these limitations.
+
+Live DeepSeek calls are disabled by default even if a key exists. Enabling them
+requires an explicit process flag and remains subject to a small per-process
+call budget. The public frontend demo does not require a live model or a public
+backend.
+
+## What the prototype intentionally does not compute
+
+Without submitted evidence, the system does not produce:
+
+- store or location counts;
+- sales, revenue, GMV, profit, or valuation estimates;
+- confidence, fraud, or risk scores;
+- customer or investigation counts;
+- supported or unsupported verdicts.
+
+Instead, the evidence ledger remains empty and the conclusion gate remains
+locked.
+
+## Production path
+
+Before live diligence use, the product would need:
+
+- authenticated organizations and role-based access;
+- encrypted durable storage and retention policy;
+- versioned strategy and receipt schemas;
+- licensed or customer-authorized connectors;
+- provider-backed delivery and receipt verification where possible;
+- source-dependence and sampling-bias controls;
+- human approval policies;
+- legal, privacy, platform, and sector-specific review.
+
+Those items are roadmap targets, not current capabilities.

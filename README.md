@@ -1,28 +1,89 @@
 # LRWA Agent API
 
-Backend for **LRWA — Live Real-World Assurance / 现实验证引擎**. This NestJS
-hackathon demo investigates the entirely fictional **晨潮咖啡 Morrow** inside a
-deterministic Reality Twin, producing traceable evidence, cross-validated
-findings and a caller-gated counterfactual replay.
+NestJS backend for **LRWA, Live Real-World Assurance**. The primary API turns
+one commercial claim into a staged evidence mission without manufacturing
+contacts, receipts, business metrics, or conclusions.
 
-> Synthetic-only boundary: every case, store, probe, event, source and evidence
-> item is `SIMULATED`. The demo never impersonates a real person, contacts a
-> real company, places a real order, scrapes a real platform, or processes real
-> personal data. It is a product demonstration, not evidence about any real
-> business.
+## What the primary API does
 
-## OpenArena reviewer links
+1. Accepts a subject, falsifiable claim, operating mode and selected role
+   perspectives.
+2. Produces draft buyer, supplier, peer and skeptic inquiry strategies.
+3. Records that the user prepared or copied a strategy.
+4. Records a user attestation that they sent it through a real, authorized
+   channel and requires the channel label. The server does not send the
+   message.
+5. Accepts a user-submitted receipt and computes its SHA-256 content hash on
+   the server.
+6. Returns the current missions, receipt ledger and event history.
 
-- Public product demo:
-  https://lrwa-agent-web.cheeky-angel-7701.chatgpt.site
-- 90-second demo film:
-  https://cdn.jsdelivr.net/gh/0xWeakSheep/lrwa-agent-web@11a13d001444f047ff3582870b2f3f6adb6f6c60/public/materials/LRWA_OpenArena_Demo_90s_web.mp4
-- Public pitch deck:
-  https://cdn.jsdelivr.net/gh/0xWeakSheep/lrwa-agent-web@6e98567e579c0c967c68729f6231cfe09480926d/public/materials/LRWA_Seed_Deck.pdf
-- Next.js frontend:
-  https://github.com/0xWeakSheep/lrwa-agent-web
+There is no `start` or `complete` action in the evidence-operations API. A plan
+cannot silently become evidence.
 
-## Run
+## Truth and storage boundaries
+
+- Meituan and Google connectors are **not configured**.
+- The only available external path is manual: the user sends through an
+  authorized channel and explicitly confirms that action.
+- A user-submitted receipt is not provider-verified. Its hash supports content
+  integrity, not source authenticity.
+- `simulation_lab` cannot record real contact or write to the real receipt
+  ledger.
+- Current server storage is an in-memory prototype. Process restarts remove
+  investigations.
+- There is no authentication, tenant isolation, durable event store, encrypted
+  database, provider webhook verification or compliance-grade approval yet.
+
+These limitations are returned by the API and shown in the frontend.
+
+## DeepSeek planning layer
+
+DeepSeek is opt-in per investigation. It is limited to one structured `PLAN`
+operation that can draft:
+
+- objective
+- opening question
+- follow-up rule
+- requested receipt
+
+Fixed role names, perspectives and safety boundaries remain server-controlled.
+The server rejects a generated plan when its role set changes or its text
+matches the known prohibited identity, deception, fabricated-action, metric,
+or conclusion patterns. This filter is a prototype safeguard, not a complete
+semantic classifier, so every model draft remains pending human review. The
+model has no authority to mark a mission as prepared or contacted, create a
+receipt, write a metric, or unlock a conclusion.
+
+The response exposes whether planning used:
+
+- `LIVE`: the configured DeepSeek model returned validated JSON.
+- `DETERMINISTIC_FALLBACK`: a call was requested but no valid model result was
+  available.
+- `NOT_REQUESTED`: the user kept model processing off.
+
+Configuration:
+
+```dotenv
+PORT=3001
+CORS_ORIGINS=http://localhost:3000
+MAX_INVESTIGATIONS=100
+MAX_RECEIPTS_PER_INVESTIGATION=32
+INVESTIGATION_TTL_MS=14400000
+DEEPSEEK_API_KEY=
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-v4-flash
+ENABLE_LIVE_LLM=false
+MAX_LIVE_LLM_HTTP_REQUESTS_PER_PROCESS=8
+```
+
+The key is read only from the backend process environment. It is never returned
+in API payloads or stored in the repository. A key alone does not enable paid
+calls: `ENABLE_LIVE_LLM` must also be exactly `true`. The per-process HTTP
+request budget includes retries and is a prototype cost guard, not an
+authentication or production rate-limiting system. Do not expose this
+unauthenticated prototype API with a live key.
+
+## Run locally
 
 ```bash
 cp .env.example .env
@@ -30,164 +91,40 @@ npm install
 npm run start:dev
 ```
 
-The default API is `http://localhost:3001/v1`; `PORT` can override it. No API
-key or external service is required.
+The API runs at `http://localhost:3001/v1`.
 
-For the exact demo formulas, heuristic policy score, replay behavior,
-limitations, and production calibration path, see
-[METHODOLOGY.md](./METHODOLOGY.md).
+## Evidence-operations API
 
-## DeepSeek language layer
-
-DeepSeek optionally powers three bounded language tasks:
-
-- `PLAN`: explains the five-category plan and its declared aggregate quota of
-  1,024.
-- `CHALLENGE`: helps the Skeptic articulate the fixed 20% corporate-order
-  counter-hypothesis.
-- `EXPLANATION`: explains deterministic findings and next actions.
-
-It never generates evidence, measurements, hashes, fixed scenario bands,
-heuristic policy scores, verdicts or replay parameters. Those remain in the
-seeded deterministic pipeline. If `DEEPSEEK_API_KEY` is absent, times out,
-returns invalid JSON, is rate-limited or has an upstream failure, the same API
-flow completes with deterministic local language. HTTP 429 and 5xx responses
-receive one short retry.
-
-The demo requests non-thinking JSON mode with a 512-token ceiling so the live
-language layer stays fast and bounded.
-
-Configuration:
-
-```dotenv
-DEEPSEEK_API_KEY=
-DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_MODEL=deepseek-v4-flash
-```
-
-The key is read only from the process environment. It is never included in
-responses, events, prompts, logs or repository files. Provenance exposes only
-provider, model, operation, attempts and `LIVE` or `DETERMINISTIC_FALLBACK`
-mode. The default is `deepseek-v4-flash`; the deprecated legacy
-`deepseek-chat` name is not used.
-
-## Canonical Morrow story
-
-Management reports 48 operating stores, 118 daily orders per store, an average
-ticket of ¥19.6 and June GMV of ¥3.33m. Five logical evidence families
-represent a fixed aggregate quota of 1,024 parameterized probes. The demo
-generates five aggregate evidence receipts, not 1,024 stored raw observations.
-LRWA estimates 39 active stores and June GMV of ¥1.92m within a fixed
-¥1.72m–¥2.14m scenario band, a 42.3% gap at a 0.88 heuristic policy score.
-
-The Evidence Auditor verifies provenance and hashes, the Statistician computes
-the estimates, and the Skeptic challenges the result with an unobserved 20%
-corporate-order hypothesis. It cannot rerun autonomously: a separate
-unauthenticated UI/API interaction starts the deterministic replay. Production
-would require identity-verified approval. The hypothesis raises estimated GMV
-to ¥2.40m, changes the fixed scenario band and gap, but the reported GMV
-remains `UNSUPPORTED`.
-
-## Synthetic Agent Executor
-
-The demo now executes each of the five plan tasks separately through a
-`SyntheticAgentExecutorService`. For every task, the executor resolves the
-assigned specialist, checks that the requested tool appears in that role's
-allowlist, requires declared guardrails, enforces the `SIMULATED_ONLY`
-boundary, invokes the matching deterministic adapter, and validates the
-returned family, agent, tool, sample allocation and SHA-256 receipt hash.
-
-The event ledger records `AGENT_DISPATCHED`, `TOOL_POLICY_CHECKED`,
-`EVIDENCE_CAPTURED`, and `AGENT_TASK_COMPLETED` for each task. This is a real
-task-level orchestration path with tool-allowlist, declared-guardrail, and
-synthetic-boundary checks over deterministic adapters; it is not a claim that
-the guardrail text was independently enforced, or that five independent
-real-world agents or 1,024 live observations ran.
-
-## Exact curl flow
-
-`jq` is used only to extract IDs:
-
-```bash
-demo_json=$(curl -sS -X POST http://localhost:3001/v1/demo/cases \
-  -H 'content-type: application/json' \
-  -d '{"seed":"morrow-demo-2026"}')
-investigation_id=$(printf '%s' "$demo_json" | jq -r '.investigation.id')
-
-curl -sS -X POST \
-  "http://localhost:3001/v1/investigations/$investigation_id/plan"
-curl -sS -X POST \
-  "http://localhost:3001/v1/investigations/$investigation_id/approve"
-curl -sS -X POST \
-  "http://localhost:3001/v1/investigations/$investigation_id/start"
-
-curl -sS \
-  "http://localhost:3001/v1/investigations/$investigation_id/evidence"
-curl -sS \
-  "http://localhost:3001/v1/investigations/$investigation_id/findings"
-curl -N \
-  "http://localhost:3001/v1/investigations/$investigation_id/events"
-
-# Explicit demo interaction for the Skeptic's proposed hypothesis:
-replay_json=$(curl -sS -X POST \
-  "http://localhost:3001/v1/investigations/$investigation_id/replay" \
-  -H 'content-type: application/json' \
-  -d '{"corporateOrderShare":0.2}')
-replay_id=$(printf '%s' "$replay_json" | jq -r '.id')
-
-curl -sS \
-  "http://localhost:3001/v1/investigations/$replay_id/findings"
-curl -N \
-  "http://localhost:3001/v1/investigations/$replay_id/events"
-```
-
-The supervisor state machine is:
-
-```text
-DRAFT -> PLANNED -> APPROVED -> RUNNING -> COMPLETED
-```
-
-`APPROVED` is an internal workflow state name, not proof of identity or a
-compliance-grade approval. `start` completes synchronously for a reliable live
-demo. SSE replays the complete ordered event ledger, including
-`HYPOTHESIS_RAISED` on the initial run and `REPLAY_STARTED` only after the
-separate caller interaction.
-
-## API
-
-| Method | Endpoint | Response |
+| Method | Endpoint | Meaning |
 | --- | --- | --- |
-| `GET` | `/v1` | Health and simulation mode |
-| `POST` | `/v1/demo/cases` | `{ case, investigation }` |
-| `GET` | `/v1/cases/:caseId` | `DemoCase`, including 48 synthetic map stores |
-| `POST` | `/v1/investigations/:id/plan` | Plan with 5 tasks and a declared aggregate quota of 1,024 |
-| `POST` | `/v1/investigations/:id/approve` | Records the demo interaction gate and moves to `APPROVED` |
-| `POST` | `/v1/investigations/:id/start` | Completed initial investigation |
-| `POST` | `/v1/investigations/:id/replay` | Body `{ corporateOrderShare: 0..0.5 }` |
-| `GET` | `/v1/investigations/:id` | Investigation and hypothesis audit |
-| `GET` | `/v1/investigations/:id/evidence` | `Evidence[]`, including store signals |
-| `GET` | `/v1/investigations/:id/findings` | `Finding[]` with bounds and actions |
-| `GET` | `/v1/investigations/:id/events` | Server-sent event ledger |
+| `GET` | `/v1/evidence-operations/capabilities` | Actual storage, planner and connector state |
+| `POST` | `/v1/evidence-operations/investigations` | Create a claim and draft role missions |
+| `GET` | `/v1/evidence-operations/investigations/:id` | Read the current truthful state |
+| `POST` | `/v1/evidence-operations/investigations/:id/missions/:roleId/prepare` | User confirms local preparation/copy |
+| `POST` | `/v1/evidence-operations/investigations/:id/missions/:roleId/contact` | User attests a real authorized send |
+| `POST` | `/v1/evidence-operations/investigations/:id/evidence` | Store a user-submitted receipt and server hash |
 
-Invalid request bodies return `400`, invalid state transitions return `409`,
-and unknown entities return `404`.
+Example creation request:
 
-## Evidence and reproducibility policy
+```json
+{
+  "idempotencyKey": "7e505d5d-e337-45e6-9ba2-7d4f5e541579",
+  "subject": "Example brand",
+  "claim": "Every publicly listed location is operating",
+  "sourceNote": "Company-provided material",
+  "mode": "assisted_live",
+  "roleIds": ["buyer", "supplier", "competitor", "skeptic"],
+  "allowModelProcessing": false
+}
+```
 
-- Every evidence item records `SIMULATED`, source family and methodology,
-  agent, tool, sample size and SHA-256 content hash.
-- Store observation, synthetic consumer panel, digital footprint, labor and
-  supply-chain signals are different logical evidence families; statistical
-  independence is not claimed.
-- The demo's `HIGH` policy band requires at least two logical evidence
-  families.
-- The same seed and same hypothesis produce identical measurements, findings
-  and replay identity.
-- The replay request is validated, recorded on the investigation, and emitted
-  in auditable SSE events.
-- `investigation.llmRuns`, `agentInsights.*.provenance` and
-  `LLM_LAYER_USED` events identify the language provider, model and mode without
-  exposing prompts or secrets.
+The created missions all start as `planned`. Contact confirmation requires the
+selected mission to have a recorded preparation step. Real-contact semantics
+and real receipts are rejected in `simulation_lab`. A receipt also requires a
+previously confirmed authorized contact action for that role.
+
+Creation requests require a UUID `idempotencyKey`. An exact retry returns the
+same investigation; the same key with different input is rejected.
 
 ## Verify
 
@@ -199,19 +136,17 @@ npm run test:e2e -- --runInBand
 npm run build
 ```
 
-Tests cover the canonical values, 48 map stores, the declared aggregate quota
-of 1,024, five aggregate receipts, task-level tool policy enforcement, blocked
-unauthorized tools, seeded reproducibility, evidence hash traceability, the
-heuristic policy gate, REST state transitions, SSE, hypothesis validation,
-changed replay results, no-key fallback, live JSON parsing, provenance and
-retry behavior.
+The evidence-operations end-to-end tests verify:
 
-## Container deployment
-
-```bash
-docker build -t lrwa-agent .
-docker run --rm -p 3001:3001 -e PORT=3001 lrwa-agent
-```
-
-`render.yaml` provides a Docker-based Render web-service blueprint. The server
-always binds the platform-provided `PORT`.
+- plans start empty of evidence and completion claims;
+- connector capability states are explicit;
+- user confirmation is required for contact and receipts;
+- server receipt hashes use SHA-256;
+- an exact retry of a receipt ID is idempotent, while different content under
+  the same ID is rejected;
+- browser CORS access is limited to configured origins;
+- simulation mode cannot create real-contact state;
+- DeepSeek fallback provenance stays visible;
+- unsafe or role-mismatched generated plans fall back instead of being labeled
+  as live model plans;
+- the retired `/v1/demo/**` namespace returns `404`.
